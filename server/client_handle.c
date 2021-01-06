@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "client_handle.h"
 #include "logger.h"
@@ -25,7 +26,7 @@ int add_new_client(int socket_fd) {
             clients[i].active = 1;
             clients[i].socket_fd = socket_fd;
             clients[i].opened_file_fd = -1;
-            clients[i].time_left = -1;          // TODO
+            update_timeout(socket_fd);
 
             return MYNFS_SUCCESS;
         }
@@ -36,9 +37,9 @@ int add_new_client(int socket_fd) {
 }
 
 static void close_client(struct client* client) {
-    // TODO:
-    nfs_log_error(logger, "Not implemented yet");
-    return;
+    close(client->opened_file_fd);
+    client->opened_file_fd = -1;
+    client->active = 0;
 }
 
 
@@ -261,12 +262,20 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
 
 
 void update_timeout(int socket_fd) {
-    // TODO: Update timeout
+    struct client* client = get_client_by_socket(socket_fd);
+    if(client == NULL)
+        return;
+    client->time_left = time(NULL) + CLIENT_TIMEOUT_VALUE;
 }
 
 
-void check_timeouts(void) {
-    // TODO:
-    return;
+int check_timeouts(void) {
+    unsigned long current_time = time(NULL);
+    for(int i = 0; i < ARRAY_SIZE(clients); i++)
+        if(clients[i].active && clients[i].time_left < current_time) {
+            close_client(&clients[i]);
+            return clients[i].socket_fd;
+        }
+    return -1;
 }
 

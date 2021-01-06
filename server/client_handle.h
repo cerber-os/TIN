@@ -8,6 +8,8 @@
 #define MAX_CLIENTS_COUNT       (16)
 // Maximum size of one READ operation
 #define MAX_READ_SIZE           (4096)
+// Timeout after which client gets disconnected (5 min)
+#define CLIENT_TIMEOUT_VALUE    (60 * 5)
 
 
 /*
@@ -19,7 +21,7 @@ struct client {
 
     int socket_fd;
     int opened_file_fd;
-    int time_left;
+    unsigned long time_left;
 };
 
 extern struct client clients[MAX_CLIENTS_COUNT];
@@ -49,8 +51,9 @@ void update_timeout(int socket_fd);
 int add_new_client(int socket_fd);
 
 /*
- * check_timeouts - iterate over every active client and close its connection if
- *      timeout occurred
+ * check_timeouts - iterate over every active client and close connection of the first one
+ *      that has its timeout expired
+ * @returns: socket FD to be closed
  */
-void check_timeouts(void);
+int check_timeouts(void);
 
