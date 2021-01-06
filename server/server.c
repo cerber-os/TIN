@@ -2,9 +2,18 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/select.h>
+#include <time.h>
+
 #include "logger.h"
 #include "config_parser.h"
 
+#define MAX_FDS 128
+#define max(a,b) (((a)>(b)) ? (a):(b))
 
 struct nfs_logger* logger;
 
@@ -83,5 +92,102 @@ int main() {
     parse_config(fields, 4, "server/example.cfg");
     nfs_log_info(logger, "Selected port: %d", port_number);
 
-    int isOk = check_credentials("username", "password");
+    // create listening socket
+    int sock, length;
+    struct sockaddr_in server;
+    fd_set ready;
+    struct timeval timeout;
+    int msgsock=-1, nfds, nactive;
+    int sockets_table[MAX_FDS];
+
+    int rval=0, i;
+	for (i=0; i<MAX_FDS; i++) 
+        sockets_table[i]=0;
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == -1) {
+        perror("opening stream socket");
+        exit(1);
+    }
+	nfds = sock+1;
+    
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr(hostname);
+    server.sin_port = htons(port_number);
+    if (bind(sock, (struct sockaddr *) &server, sizeof server) == -1) 
+    {
+        perror("binding stream socket");
+        exit(1);
+    }
+    /* wydrukuj na konsoli przydzielony port */
+    length = sizeof( server);
+    if (getsockname(sock,(struct sockaddr *) &server,&length) == -1) {
+        perror("getting socket name");
+        exit(1);
+    }
+    printf("Socket port #%d\n", ntohs(server.sin_port));
+
+    listen(sock, 5);
+    do {
+        FD_ZERO(&ready);
+        FD_SET(sock, &ready);
+        for (i=0; i<MAX_FDS; i++) /* dodaj aktywne do zbioru */
+            if (sockets_table[i] > 0 )
+                FD_SET(sockets_table[i], &ready);
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        if((nactive=select(nfds, &ready, NULL, NULL, &timeout)) == -1) 
+        {
+             perror("select");
+             continue;
+        }
+ 
+        if (FD_ISSET(sock, &ready)) 
+        {
+            msgsock = accept(sock, (struct sockaddr *)0, (int *)0);
+            if (msgsock == -1)
+                perror("accept");
+            nfds=max(nfds, msgsock+1);
+            if(nfds > MAX_FDS)
+                perror("accept");
+            else
+            {
+                sockets_table[msgsock]=msgsock;
+                printf("accepted...\n");
+            }
+        } 
+        for (i=0; i<MAX_FDS; i++)
+            if ((msgsock=sockets_table[i])>0 && FD_ISSET(sockets_table[i], &ready)) 
+            {
+                /*
+                Tutaj obsługujemy żadania od klientów.
+                Czyli najpierw musimy zrobić read'a, aby wiedzieć czego chca
+                */
+                
+                if((rval = read(msgsock, NULL, 0)) == -1)
+                    perror("reading stream message");
+
+                /*
+                Po zrobienie read'a wiemy co od nas klient chce.
+                Jeśli chce sie zalogować to linijka niżej pokazuje przykład
+                */
+                int isOk = check_credentials("username", "password");
+
+                // ponizej jest kod ktory sprawdza czy cokolwiek odczytalismy
+                if (rval == 0) 
+                {
+                    printf("Ending connection\n");
+                    close( msgsock );
+                    sockets_table[msgsock] = -1; 
+                }
+                else
+                    continue;
+                
+                /* No i tutaj musimy wrzucic jakiegos handlera.
+                Jeszcze nie wiem jak on bedzie wygladac wiec pozostawiam komentarz */
+        }
+		if (nactive==0)  
+            printf("Noone is ready. Restarting select...\n");
+    } while(1);
 }
