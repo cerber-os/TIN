@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "client_handle.h"
 #include "logger.h"
@@ -72,14 +73,16 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         return MYNFS_INVALID_PACKET;
     }
 
-    if(packet->cmd != MYNFS_CMD_OPEN && client->opened_file_fd < 0) {
-        nfs_log_error(logger, "Attempted to execute command without openning file: %d", packet->cmd);
-        return MYNFS_INVALID_PACKET;
-    }
+    if(packet->cmd != MYNFS_CMD_OPEN && packet->cmd != MYNFS_CMD_UNLINK) {
+        if(client->opened_file_fd < 0) {
+            nfs_log_error(logger, "Attempted to execute command without openning file: %d", packet->cmd);
+            return MYNFS_INVALID_PACKET;
+        }
 
-    if(packet->cmd != MYNFS_CMD_OPEN && packet->handle != client->opened_file_fd) {
-        nfs_log_error(logger, "Invalid handle provided by user (%d)", packet->handle);
-        return MYNFS_INVALID_CLIENT;
+        if(packet->handle != client->opened_file_fd) {
+            nfs_log_error(logger, "Invalid handle provided by user (%d)", packet->handle);
+            return MYNFS_INVALID_CLIENT;
+        }
     }
 
     switch(packet->cmd) {
@@ -95,7 +98,7 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
                 return MYNFS_ALREADY_OPENED;
             }
 
-            char* path_name = strndup(open_data->name, open_data->path_length);
+            char* path_name = strndup((char*)open_data->name, open_data->path_length);
             // TODO: Sanitize path_name
 
             client->opened_file_fd = open(path_name, open_data->oflag, open_data->mode);
@@ -173,12 +176,56 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         }
         break;
 
+        case MYNFS_CMD_FSTAT: {
+            //int fstat(int fd, struct stat *buf);
+            if(packet->data_length != 0)
+                nfs_log_warn(logger, "Expected packet to be empty for FSTAT command, but size is '%d'", packet->data_length);
+            
+            *response = calloc(1, sizeof(struct stat));
+            if(*response == NULL) {
+                // TODO: Error handling ...
+            }
+
+            int ret = fstat(client->opened_file_fd, (struct stat *)*response);
+            if(ret < 0) {
+                nfs_log_error(logger, "Failed to fstat file - errno: %d", errno);
+                free(*response);
+                return (errno > 0) ? -1 * errno : errno;
+            }
+
+            *response_size = sizeof(struct stat);
+            return ret;
+        }
+        break;
+
+        case MYNFS_CMD_UNLINK: {
+            struct mynfs_unlink_t* unlink_data = (struct mynfs_unlink_t*) packet->data;
+            if(packet->data_length < sizeof(*unlink_data) 
+                    || packet->data_length < sizeof(*unlink_data) + unlink_data->path_length) {
+                nfs_log_error(logger, "Invalid size of packet mynfs_unlink_t (%d)", packet->data_length);
+                return MYNFS_INVALID_PACKET;
+            }
+
+            char* path_name = strndup((char*)unlink_data->name, unlink_data->path_length);
+            // TODO: Sanitize path_name
+
+            int ret = unlink(path_name);
+
+            if(ret < 0) {
+                nfs_log_error(logger, "Failed to unlink file `%s` - errno: %d", path_name, errno);
+                free(path_name);
+                return (errno > 0) ? -1 * errno : errno;
+            }
+
+            free(path_name);
+            return MYNFS_SUCCESS;
+        }
+        break;
+
         case MYNFS_CMD_CLOSE: {
             close_client(client);
             return MYNFS_CLOSED;
         }
-
-        // TODO: the rest
 
         default: {
             nfs_log_error(logger, "Unknown command provided by user (%d)", packet->cmd);
@@ -191,10 +238,10 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
 }
 
 int process_client_message(int socket_fd, void* packet, size_t packet_size, void** response, size_t* response_size) {
-    int ret = _process_client_message(socket_fd, packet, packet_size, response, response_size);
+    int ret = _process_client_message(socket_fd, packet, packet_size, (char**)response, response_size);
     
     if(*response_size == 0) {
-        create_simple_response(0, ret, response, response_size);
+        create_simple_response(0, ret, (struct mynfs_datagram_t**)response, response_size);
     } else {
         struct mynfs_datagram_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
         if(full_packet == NULL) {
