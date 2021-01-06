@@ -2,7 +2,7 @@
 
 
 //"należy zaimplementować co najmniej następujące tryby otwarcia pliku: O_RDONLY, O_WRONLY, O_RDWR, O_CREAT"
-int mynfs_open(char *host, int port, const char *pathname, int flags, mode_t mode){
+int mynfs_open(char *host, int port, char *pathname, int flags, mode_t mode){
 
     //ogarnianie komunikatu podrzednego
     int path_length = strlen(pathname);
@@ -59,7 +59,7 @@ int mynfs_read(char *host, int port, int fd, void *buf, size_t count)
 }
 
 
-ssize_t mynfs_write(char *host, int port, int fd, const void *buf, size_t count)
+ssize_t mynfs_write(char *host, int port, int fd, void *buf, size_t count)
 {  
     char *bufor = (char *)buf;
 
@@ -131,7 +131,7 @@ int mynfs_close(char *host, int port, int fd)
 }
 
 
-int mynfs_unlink(char *host, int port, const char *pathname)
+int mynfs_unlink(char *host, int port, char *pathname)
 {
     //ogarnianie komunikatu podrzednego
     int path_length = strlen(pathname);
