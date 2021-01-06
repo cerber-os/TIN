@@ -14,7 +14,7 @@ out/server: server/server.c out/logger.o out/config_parser.o
 	$(C) $(CFLAGS) -o out/server out/logger.o out/config_parser.o server/server.c
 
 
-#  Pliki klienta
+# Pliki klienta
 out/fileOperations.o: library/fileOperations.cpp
 	$(Cpp) $(CFLAGS) -o out/fileOperations.o -c library/fileOperations.cpp
 

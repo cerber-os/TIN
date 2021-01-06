@@ -17,8 +17,8 @@ int mynfs_read(int fd, void *buf, size_t count)
     memcpy(data, &clientSubMsg, sizeof(mynfs_read_t));
 
     clientMsg.cmd= 345;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
-    clientMsg.handle = htonl(fd);       //TODO: sprawdzic czy htonl jest tu wszędzie potrzebne
-    clientMsg.data_length = htonl(sizeof(mynfs_read_t));
+    clientMsg.handle = fd;       //TODO: sprawdzic czy htonl jest tu wszędzie potrzebne
+    clientMsg.data_length = sizeof(mynfs_read_t);
     // clientMsg.data = new char[sizeof(mynfs_read_t)];
     // clientMsg.data = &data;     //TODO: zapomnialem jak to w C++ sie robi, zaraz to poprawie
 

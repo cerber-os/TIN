@@ -31,13 +31,13 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
     std::cout<<"Connect succced"<<std::endl;
 
     //Wysylanie requesta do serwera
-    write(socketFd, clientRequest, sizeof(clientRequest));
+    write(socketFd, clientRequest, sizeof(*clientRequest));
 
     /*
     Ta czesc jest wykomentowana, bo nie mamy mozliwosci narazie przetestowac odpowiedzi serwera
 
     //Odbieranie response z serwera
-    char response[sizeof(mynfs_msg_t)];     //Rozmiar response jest zmienny, wiec chyba bedzie tu problem
+    char response[sizeof(mynfs_msg_t)];     //Rozmciar response jest zmienny, wiec chyba bedzie tu problem
     read(socketFd, response, sizeof(mynfs_msg_t));
 
     (*serverResponse) = (mynfs_msg_t *) response;
