@@ -2,7 +2,7 @@
 
 
 //"należy zaimplementować co najmniej następujące tryby otwarcia pliku: O_RDONLY, O_WRONLY, O_RDWR, O_CREAT"
-int mynfs_open(const char *pathname, int flags, mode_t mode){
+int mynfs_open(const char *pathname, const char *flags, mode_t mode){
     return 1;
 }
 

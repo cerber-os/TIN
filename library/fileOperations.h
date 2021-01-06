@@ -9,7 +9,7 @@
 
 //Argumenty sa takie same jak w zwyklych linuxowych wersjach tych funkcji
 
-int mynfs_open(const char *pathname, int flags, mode_t mode);
+int mynfs_open(const char *pathname, const char *flags, mode_t mode);
 
 int mynfs_read(int fd, void *buf, size_t count);
 ssize_t mynfs_write(int fd, const void *buf, size_t count);
