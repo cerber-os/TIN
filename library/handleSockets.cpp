@@ -37,8 +37,8 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
     Ta czesc jest wykomentowana, bo nie mamy mozliwosci narazie przetestowac odpowiedzi serwera
 
     //Odbieranie response z serwera
-    char response[sizeof(mynfs_msg_t)];     //Rozmciar response jest zmienny, wiec chyba bedzie tu problem
-    read(socketFd, response, sizeof(mynfs_msg_t));
+    char response[4000];
+    read(socketFd, response, 4000);
 
     (*serverResponse) = (mynfs_msg_t *) response;
     std::cout << "Response is received" << std::endl;
