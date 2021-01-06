@@ -146,7 +146,8 @@ int parse_config(struct config_field* fields, size_t number_of_fields, char* pat
     }
 
     size_t read_part, total_read = 0;
-    while((read_part = read(fd, config_buffer, CONFIG_BUFFER_SIZE)) > 0)
+    while(total_read < CONFIG_BUFFER_SIZE && 
+            (read_part = read(fd, config_buffer + total_read, CONFIG_BUFFER_SIZE - total_read)) > 0)
         total_read += read_part;
     
     if(total_read == 0) {
