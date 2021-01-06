@@ -69,17 +69,22 @@ void run_server(int portNumber) {
 }
 
 void getDataFromSocket(int new_socket) {
-    char *buf = new char[sizeof(mynfs_msg_t)];
-    int bytes = recv(new_socket, buf, sizeof(mynfs_msg_t), 0);
+    char *buf = new char[4000];
+    int bytes = recv(new_socket, buf, 4000, 0);
     if(bytes <= 0 ){
         perror("receive failure");
         exit(EXIT_FAILURE);
     }
     std::cout<<std::endl<<"Otrzymano bajtow: "<<bytes<<std::endl;
-    mynfs_msg_t *received_message = (mynfs_msg_t *) buf;
 
+    mynfs_msg_t *received_message = (mynfs_msg_t *) buf;
     std::cout<<"CMD: "<< received_message->cmd<<std::endl;
     std::cout<<"Handle: "<< received_message->handle<<std::endl;
     std::cout<<"Data length: "<< received_message->data_length<<std::endl;
+
+    //ten fragment jest tylko do komendy read dostosowany
+    mynfs_read_t *inner_message = (mynfs_read_t *) received_message->data;
+    std::cout<<"Read length: "<< inner_message->length <<std::endl;
+
     std::cout.flush();
 }

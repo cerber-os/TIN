@@ -31,7 +31,7 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
     std::cout<<"Connect succced"<<std::endl;
 
     //Wysylanie requesta do serwera
-    write(socketFd, clientRequest, sizeof(*clientRequest));
+    write(socketFd, clientRequest, sizeof(mynfs_msg_t) + clientRequest->data_length);
 
     /*
     Ta czesc jest wykomentowana, bo nie mamy mozliwosci narazie przetestowac odpowiedzi serwera

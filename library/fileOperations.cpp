@@ -8,23 +8,22 @@ int mynfs_open(const char *pathname, int flags, mode_t mode){
 
 int mynfs_read(int fd, void *buf, size_t count)
 {
-    mynfs_msg_t clientMsg;
+    //ogarnianie komunikatu podrzednego
     mynfs_read_t clientSubMsg;
-
     clientSubMsg.length = count;
-    char data[sizeof(mynfs_read_t)];
 
-    memcpy(data, &clientSubMsg, sizeof(mynfs_read_t));
+    //ogarnianie komunikatu nadrzednego
+    mynfs_msg_t *clientMsg;
+    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t) + sizeof(mynfs_read_t));
+    memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_read_t));
 
-    clientMsg.cmd= 345;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
-    clientMsg.handle = fd;       //TODO: sprawdzic czy htonl jest tu wszędzie potrzebne
-    clientMsg.data_length = sizeof(mynfs_read_t);
-    // clientMsg.data = new char[sizeof(mynfs_read_t)];
-    // clientMsg.data = &data;     //TODO: zapomnialem jak to w C++ sie robi, zaraz to poprawie
+    clientMsg->cmd= 345;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->handle = fd;
+    clientMsg->data_length = sizeof(mynfs_read_t);
 
     char *host = "127.0.0.1";
     mynfs_msg_t *serverMsg;
-    sendMessageAndGetResponse(host, 21037, &clientMsg, &serverMsg);
+    sendMessageAndGetResponse(host, 21037, clientMsg, &serverMsg);
 
     int len = 10;
     /* ta czesc jest zakomentowana, bo nie mamy narazie odpowiedzi serwera
