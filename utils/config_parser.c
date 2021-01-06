@@ -26,7 +26,7 @@ static void remove_end_whitespaces(char* line) {
 
 // Parse one line of configuration file
 static int parse_config_line(struct nfs_logger* logger, struct config_structure* cfg, char* line, int line_no) {
-    // 1. Skip whitespaces at the beggining of line
+    // 1. Skip whitespaces at the beginning of the line
     while(*line != '\0' && isspace(*line))
         line++;
     if(*line == '\0')

@@ -52,8 +52,8 @@ int check_credentials(char* username, char* password) {
 
     retval = pam_authenticate(local_auth_handle, 0);
     if(retval != PAM_SUCCESS) {
-        if(retval == PAM_AUTH_ERR) {
-            nfs_log_error(logger, "Failed to authenticate user `%s` - invalid password", username);
+        if(retval == PAM_AUTH_ERR || retval == PAM_USER_UNKNOWN || retval == PAM_PERM_DENIED) {
+            nfs_log_error(logger, "Failed to authenticate user `%s` - invalid username/password", username);
             goto err_pam_end;
         } else {
             nfs_log_error(logger, "Failed to authenticate user `%s` - PAM error (%d)", username, retval);
