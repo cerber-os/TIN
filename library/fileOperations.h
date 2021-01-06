@@ -1,7 +1,7 @@
 #ifndef FILEOPERATIONS_H
 #define FILEOPERATIONS_H
 
-#include <string.h>
+#include <string>
 #include <arpa/inet.h>
 
 #include "msgStructs.h"

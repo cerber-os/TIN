@@ -9,6 +9,8 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
         std::cerr << "Error during socket creating" << std::endl;
         return 1;
     }
+    std::cout<<"Socket creating succced"<<std::endl;
+
 
     memset(&serv_addr, 0, sizeof(serv_addr));
 
@@ -26,9 +28,13 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
         std::cerr << "Error during connection setting" << std::endl;
         return 1;
     }
+    std::cout<<"Connect succced"<<std::endl;
 
     //Wysylanie requesta do serwera
     write(socketFd, clientRequest, sizeof(clientRequest));
+
+    /*
+    Ta czesc jest wykomentowana, bo nie mamy mozliwosci narazie przetestowac odpowiedzi serwera
 
     //Odbieranie response z serwera
     char response[sizeof(mynfs_msg_t)];     //Rozmiar response jest zmienny, wiec chyba bedzie tu problem
@@ -39,6 +45,7 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
     std::cout << "Command number: " << (*serverResponse)->cmd << std::endl;
     std::cout << "Data length: " << (*serverResponse)->data_length << std::endl;
     std::cout << "Return value: " << (*serverResponse)->return_value << std::endl;
+    */
 
 
     return 1;

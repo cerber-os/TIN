@@ -1,5 +1,8 @@
+#ifndef MSGSTRUCTS_H
+#define MSGSTRUCTS_H
+
 #include <stdint.h>
-#include <cstddef>
+#include <unistd.h>
 
 struct mynfs_msg_t { 
 
@@ -56,3 +59,5 @@ struct mynfs_unlink_t{
     char name[0]; 
 
 };
+
+#endif //MSGSTRUCTS_H

@@ -10,6 +10,6 @@
 
 #include "msgStructs.h"
 
-int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *input, mynfs_msg_t **serverResponse);
+int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *clientRequest, mynfs_msg_t **serverResponse);
 
 #endif //HANDLESOCKETS_H
