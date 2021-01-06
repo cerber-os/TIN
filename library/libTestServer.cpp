@@ -82,9 +82,14 @@ void getDataFromSocket(int new_socket) {
     std::cout<<"Handle: "<< received_message->handle<<std::endl;
     std::cout<<"Data length: "<< received_message->data_length<<std::endl;
 
-    //ten fragment jest tylko do komendy read dostosowany
-    mynfs_read_t *inner_message = (mynfs_read_t *) received_message->data;
-    std::cout<<"Read length: "<< inner_message->length <<std::endl;
+    //ten fragment jest tylko do komendy read 
+    // mynfs_read_t *inner_message = (mynfs_read_t *) received_message->data;
+    // std::cout<<"* Read length: "<< inner_message->length <<std::endl;
+
+    //ten fragment jest tylko do komendy unlink 
+    mynfs_unlink_t *inner_message = (mynfs_unlink_t *) received_message->data;
+    std::cout<<"* Path length: "<< inner_message->path_length <<std::endl;
+    std::cout<<"* Path name: "<< inner_message->name <<std::endl;
 
     std::cout.flush();
 }
