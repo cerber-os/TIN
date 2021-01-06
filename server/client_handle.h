@@ -22,7 +22,7 @@ struct client {
     int time_left;
 };
 
-struct client clients[MAX_CLIENTS_COUNT];
+extern struct client clients[MAX_CLIENTS_COUNT];
 
 /*
  * process_client_message - parse client frame and prepare the response

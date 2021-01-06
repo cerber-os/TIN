@@ -10,7 +10,7 @@
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 extern struct nfs_logger* logger;
-
+struct client clients[MAX_CLIENTS_COUNT];
 
 static struct client* get_client_by_socket(int socket_fd) {
     for(int i = 0; i < ARRAY_SIZE(clients); i++)
