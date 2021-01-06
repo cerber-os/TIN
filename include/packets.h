@@ -6,10 +6,16 @@
 #include <unistd.h>
 
 enum mynfs_error_code {
-    MYNFS_ERROR_STH     = -1000,
-    MYNFS_ERROR_ANOTHER,
+    // Critical bugs
+    MYNFS_INVALID_CLIENT   = -1000,
 
-    MYNFS_SUCCESS       = 0,
+    // Non-critical bugs
+    MYNFS_INVALID_PACKET   = -500,
+    MYNFS_UNKNOWN_COMMAND,
+    MYNFS_ALREADY_OPENED,
+
+    // Success
+    MYNFS_SUCCESS           = 0,
 };
 
 
@@ -32,7 +38,7 @@ struct mynfs_datagram_t {
 
     uint64_t cmd;
     size_t data_length;
-    char data[0];
+    uint8_t data[0];
 };
 
 
@@ -40,10 +46,10 @@ struct mynfs_datagram_t {
  * Structures provided in field `data` by client
  */
 struct mynfs_open_t {
-    int oflag;
-    int mode;
+    int32_t oflag;
+    int32_t mode;
     size_t path_length;
-    char name[0];
+    uint8_t name[0];
 };
 
 struct mynfs_read_t {
@@ -52,15 +58,15 @@ struct mynfs_read_t {
 
 struct mynfs_write_t {
     size_t length;
-    char buffer[0];
+    uint8_t buffer[0];
 };
 
 struct mynfs_lseek_t {
     size_t offset;
-    int whence;
+    int32_t whence;
 };
 
 struct mynfs_unlink_t {
     size_t path_length;
-    char name[0];
+    uint8_t name[0];
 };
