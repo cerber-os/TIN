@@ -11,8 +11,11 @@
 
 #include "logger.h"
 #include "config_parser.h"
+#include "client_handle.h"
+#include "packets.h"
 
 #define MAX_FDS 128
+#define MAX_BUF 8192
 #define max(a,b) (((a)>(b)) ? (a):(b))
 
 struct nfs_logger* logger;
@@ -99,6 +102,7 @@ int main() {
     struct timeval timeout;
     int msgsock=-1, nfds, nactive;
     int sockets_table[MAX_FDS];
+    char buf[MAX_BUF];
 
     int rval=0, i;
 	for (i=0; i<MAX_FDS; i++) 
@@ -150,44 +154,51 @@ int main() {
                 perror("accept");
             nfds=max(nfds, msgsock+1);
             if(nfds > MAX_FDS)
+            {
                 perror("accept");
+                close(msgsock);
+            }
             else
             {
                 sockets_table[msgsock]=msgsock;
-                printf("accepted...\n");
+                if(add_new_client(msgsock) ==  MYNFS_OVERLOAD)
+                {
+                    perror("add_new_client");
+                    close(msgsock);
+                }
+                else
+                    printf("accepted...\n");
             }
         } 
         for (i=0; i<MAX_FDS; i++)
             if ((msgsock=sockets_table[i])>0 && FD_ISSET(sockets_table[i], &ready)) 
-            {
-                /*
-                Tutaj obsługujemy żadania od klientów.
-                Czyli najpierw musimy zrobić read'a, aby wiedzieć czego chca
-                */
-                
-                if((rval = read(msgsock, NULL, 0)) == -1)
+            {                
+                if((rval = read(msgsock, buf, MAX_BUF)) == -1)
                     perror("reading stream message");
-
-                /*
-                Po zrobienie read'a wiemy co od nas klient chce.
-                Jeśli chce sie zalogować to linijka niżej pokazuje przykład
-                */
-                int isOk = check_credentials("username", "password");
-
-                // ponizej jest kod ktory sprawdza czy cokolwiek odczytalismy
                 if (rval == 0) 
                 {
                     printf("Ending connection\n");
-                    close( msgsock );
-                    sockets_table[msgsock] = -1; 
+                    close(msgsock);
+                    sockets_table[msgsock] = -1;
+                    continue;
+                }
+                char **response = NULL;
+                size_t response_len = 0;
+                int rv = process_client_message(msgsock, buf, rval, response, &response_len);
+                if(rv == MYNFS_CLOSED)
+                {
+                    close(msgsock);
+                    continue;
                 }
                 else
-                    continue;
-                
-                /* No i tutaj musimy wrzucic jakiegos handlera.
-                Jeszcze nie wiem jak on bedzie wygladac wiec pozostawiam komentarz */
+                {
+                    int send_val = 0;
+                    if((send_val = write(msgsock, response, response_len)) == -1)
+                        perror("writing stream message");
+                }
+                // int isOk = check_credentials("username", "password");
         }
 		if (nactive==0)  
-            printf("Noone is ready. Restarting select...\n");
+            printf("Nobody is ready. Restarting select...\n");
     } while(1);
 }
