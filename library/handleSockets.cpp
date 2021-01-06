@@ -1,6 +1,6 @@
 #include "handleSockets.h"
 
-int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *clientRequest, mynfs_msg_t **serverResponse) {
+int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse) {
     int socketFd;
     struct sockaddr_in serv_addr;
 
@@ -31,7 +31,7 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
     std::cout<<"Connect succced"<<std::endl;
 
     //Wysylanie requesta do serwera
-    write(socketFd, clientRequest, sizeof(mynfs_msg_t) + clientRequest->data_length);
+    write(socketFd, clientRequest, sizeof(mynfs_datagram_t) + clientRequest->data_length);
 
     /*
     Ta czesc jest wykomentowana, bo nie mamy mozliwosci narazie przetestowac odpowiedzi serwera
@@ -40,7 +40,7 @@ int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *client
     char response[4000];
     read(socketFd, response, 4000);
 
-    (*serverResponse) = (mynfs_msg_t *) response;
+    (*serverResponse) = (mynfs_datagram_t *) response;
     std::cout << "Response is received" << std::endl;
     std::cout << "Command number: " << (*serverResponse)->cmd << std::endl;
     std::cout << "Data length: " << (*serverResponse)->data_length << std::endl;

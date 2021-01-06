@@ -1,3 +1,6 @@
+#ifndef PACKETS_H
+#define PACKETS_H
+
 /*
  * Everything releated to communication between server and client
  */
@@ -74,3 +77,5 @@ struct mynfs_unlink_t {
     size_t path_length;
     uint8_t name[0];
 };
+
+#endif //PACKETS_H

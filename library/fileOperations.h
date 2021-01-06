@@ -4,7 +4,7 @@
 #include <string>
 #include <arpa/inet.h>
 
-#include "msgStructs.h"
+#include "../include/packets.h"
 #include "handleSockets.h"
 
 //Argumenty sa takie same jak w zwyklych linuxowych wersjach tych funkcji + char *host, int port

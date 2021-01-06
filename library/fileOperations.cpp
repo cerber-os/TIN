@@ -10,21 +10,21 @@ int mynfs_open(char *host, int port, const char *pathname, int flags, mode_t mod
 
     mynfs_open_t *clientSubMsg;
     clientSubMsg = (mynfs_open_t *)malloc (sub_msg_size);
-    strcpy(clientSubMsg->name, pathname);
+    strcpy((char*)clientSubMsg->name, pathname);
     clientSubMsg->path_length = path_length;
     clientSubMsg->oflag = flags;
     clientSubMsg->mode = mode;
 
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t) + sub_msg_size);
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
 
-    clientMsg->cmd= 0;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_OPEN;
     clientMsg->handle = 0;
     clientMsg->data_length = sub_msg_size;
 
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
 
     // TODO: sprawdzic czy nie trzeba uzyc tu "ntohl"
@@ -40,15 +40,15 @@ int mynfs_read(char *host, int port, int fd, void *buf, size_t count)
     clientSubMsg.length = count;
 
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t) + sizeof(mynfs_read_t));
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sizeof(mynfs_read_t));
     memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_read_t));
 
-    clientMsg->cmd= 1;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_READ;
     clientMsg->handle = fd;
     clientMsg->data_length = sizeof(mynfs_read_t);
 
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
 
     // int len = ntohl(serverMsg->data_length);
@@ -69,18 +69,18 @@ ssize_t mynfs_write(char *host, int port, int fd, const void *buf, size_t count)
    
     mynfs_write_t *clientSubMsg =  (mynfs_write_t *)malloc (sub_msg_size);
     clientSubMsg->length = count;
-    strcpy(clientSubMsg->buffer, bufor);
+    strcpy((char*)clientSubMsg->buffer, bufor);
     clientSubMsg->length = buf_length;
  
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t) + sub_msg_size);
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
  
-    clientMsg->cmd= 2;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_WRITE;
     clientMsg->handle = fd;
     clientMsg->data_length = sub_msg_size;
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
  
     // return serverMsg->return_value;
@@ -95,15 +95,15 @@ off_t mynfs_lseek(char *host, int port, int fd, off_t offset, int whence){
     clientSubMsg.whence = whence;
 
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t) + sizeof(mynfs_lseek_t));
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sizeof(mynfs_lseek_t));
     memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_lseek_t));
 
-    clientMsg->cmd= 3;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_LSEEK;
     clientMsg->handle = fd;
     clientMsg->data_length = sizeof(mynfs_lseek_t);
 
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
 
     // return value powinno byc offsetem
@@ -116,14 +116,14 @@ int mynfs_close(char *host, int port, int fd)
     //brak komunikatu podrzednego
 
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t));
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t));
 
-    clientMsg->cmd= 4;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_CLOSE;
     clientMsg->handle = fd;
     clientMsg->data_length = 0;
 
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
 
     //TODO: obsluga kodow o bledzie z serwera
@@ -139,19 +139,19 @@ int mynfs_unlink(char *host, int port, const char *pathname)
 
     mynfs_unlink_t *clientSubMsg;
     clientSubMsg = (mynfs_unlink_t *)malloc (sub_msg_size);
-    strcpy(clientSubMsg->name, pathname);
+    strcpy((char*)clientSubMsg->name, pathname);
     clientSubMsg->path_length = path_length;
 
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t) + sub_msg_size);
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
 
-    clientMsg->cmd= 6;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_UNLINK;
     clientMsg->handle = 0;
     clientMsg->data_length = sub_msg_size;
 
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
 
     // TODO: obsluga kodow bledow z serwera
@@ -164,14 +164,14 @@ int mynfs_fstat(char *host, int port, int fd, struct stat *buf)
     //brak komunikatu podrzednego
     
     //ogarnianie komunikatu nadrzednego
-    mynfs_msg_t *clientMsg;
-    clientMsg = (mynfs_msg_t *)malloc (sizeof (mynfs_msg_t));
+    mynfs_datagram_t *clientMsg;
+    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t));
 
-    clientMsg->cmd= 5;     //TODO: zamienic liczby na komendy zdefiniowane w ../include
+    clientMsg->cmd= MYNFS_CMD_FSTAT;
     clientMsg->handle = fd;
     clientMsg->data_length = 0;
 
-    mynfs_msg_t *serverMsg;
+    mynfs_datagram_t *serverMsg;
     sendMessageAndGetResponse(host, port, clientMsg, &serverMsg);
 
     stat *stat_table = (stat *) serverMsg->data;

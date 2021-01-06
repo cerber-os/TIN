@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 #include <iostream>
 
-#include "msgStructs.h"
+#include "../include/packets.h"
 
 /*
 Prosty serwer testowy wyswietlajacy wszystkie nadchodzace komunikaty. Do sprawdzania poprawnosci biblioteki klienckiej
@@ -77,7 +77,7 @@ void getDataFromSocket(int new_socket) {
     }
     std::cout<<std::endl<<"Otrzymano bajtow: "<<bytes<<std::endl;
 
-    mynfs_msg_t *received_message = (mynfs_msg_t *) buf;
+    mynfs_datagram_t *received_message = (mynfs_datagram_t *) buf;
     std::cout<<"CMD: "<< received_message->cmd<<std::endl;
     std::cout<<"Handle: "<< received_message->handle<<std::endl;
     std::cout<<"Data length: "<< received_message->data_length<<std::endl;

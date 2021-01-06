@@ -8,8 +8,8 @@
 #include <unistd.h>
 #include <iostream>
 
-#include "msgStructs.h"
+#include "../include/packets.h"
 
-int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_msg_t *clientRequest, mynfs_msg_t **serverResponse);
+int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse);
 
 #endif //HANDLESOCKETS_H
