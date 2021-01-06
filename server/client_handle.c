@@ -150,14 +150,18 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
                 return MYNFS_INVALID_PACKET;
             }
 
-            // TODO: Add support for partial write (i.e. ret != write_data->length). Some loop
-            //      or whatever...
-            int ret = write(client->opened_file_fd, write_data->buffer, write_data->length);
-            if(ret < 0) {
-                nfs_log_error(logger, "Failed to write file - errno: %d", errno);
-                return (errno > 0) ? -1 * errno : errno;
+            size_t current_pos = 0;
+            while(current_pos < write_data->length) {
+                int ret = write(client->opened_file_fd, write_data->buffer + current_pos, write_data->length - current_pos);
+                if(ret < 0) {
+                    nfs_log_error(logger, "Failed to write file - errno: %d", errno);
+                    return (errno > 0) ? -1 * errno : errno;
+                }
+
+                current_pos += ret;
             }
-            return ret;
+
+            return current_pos;
         }
         break;
 
@@ -178,13 +182,13 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         break;
 
         case MYNFS_CMD_FSTAT: {
-            //int fstat(int fd, struct stat *buf);
             if(packet->data_length != 0)
                 nfs_log_warn(logger, "Expected packet to be empty for FSTAT command, but size is '%d'", packet->data_length);
             
             *response = calloc(1, sizeof(struct stat));
             if(*response == NULL) {
-                // TODO: Error handling ...
+                nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
+                return MYNFS_OVERLOAD;
             }
 
             int ret = fstat(client->opened_file_fd, (struct stat *)*response);
@@ -246,7 +250,9 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
     } else {
         struct mynfs_datagram_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
         if(full_packet == NULL) {
-            // TODO: Error handling...
+            nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
+            *response = *response_size = 0;
+            return MYNFS_OVERLOAD;
         }
 
         full_packet->return_value = ret;
