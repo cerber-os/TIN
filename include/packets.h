@@ -13,6 +13,7 @@ enum mynfs_error_code {
     MYNFS_INVALID_PACKET   = -500,
     MYNFS_UNKNOWN_COMMAND,
     MYNFS_ALREADY_OPENED,
+    MYNFS_OVERLOAD,
 
     // Success
     MYNFS_SUCCESS           = 0,
