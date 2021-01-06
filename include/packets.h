@@ -15,6 +15,9 @@ enum mynfs_error_code {
     MYNFS_ALREADY_OPENED,
     MYNFS_OVERLOAD,
 
+    // Others
+    MYNFS_CLOSED            = 100,
+
     // Success
     MYNFS_SUCCESS           = 0,
 };

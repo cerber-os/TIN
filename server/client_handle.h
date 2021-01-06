@@ -1,8 +1,11 @@
+/*
+ * Everything releated to processing user packets in server application
+ */
 #include <stdlib.h>
+
 
 // Maximum number of active client sessions
 #define MAX_CLIENTS_COUNT       (16)
-
 // Maximum size of one READ operation
 #define MAX_READ_SIZE           (4096)
 
@@ -30,7 +33,7 @@ struct client clients[MAX_CLIENTS_COUNT];
  *  response_size - size of response buffer
  * @returns: one of the `mynfs_error_code` values
  */
-int process_client_message(int socket_fd, char* packet, size_t packet_size, char** response, size_t* response_size);
+int process_client_message(int socket_fd, void* packet, size_t packet_size, void** response, size_t* response_size);
 
 /*
  * update_timeout - refresh timer of client represented by socket FD

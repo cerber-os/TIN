@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 
 #include "client_handle.h"
@@ -9,12 +10,36 @@
 
 extern struct nfs_logger* logger;
 
+
 static struct client* get_client_by_socket(int socket_fd) {
     for(int i = 0; i < ARRAY_SIZE(clients); i++)
         if(clients[i].active && clients[i].socket_fd == socket_fd)
             return &clients[i];
     return NULL;
 }
+
+int add_new_client(int socket_fd) {
+    for(int i = 0; i < ARRAY_SIZE(clients); i++) {
+        if(!clients[i].active) {
+            clients[i].active = 1;
+            clients[i].socket_fd = socket_fd;
+            clients[i].opened_file_fd = -1;
+            clients[i].time_left = -1;          // TODO
+
+            return MYNFS_SUCCESS;
+        }
+    }
+
+    nfs_log_error(logger, "Failed to add new client - too many open sessions");
+    return MYNFS_OVERLOAD;
+}
+
+static void close_client(struct client* client) {
+    // TODO:
+    nfs_log_error(logger, "Not implemented yet");
+    return;
+}
+
 
 static void create_simple_response(int cmd, int ret_val, struct mynfs_datagram_t** response, size_t* response_size) {
     *response = calloc(1, sizeof(**response));
@@ -44,6 +69,11 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
 
     if(packet_size < sizeof(*packet) || packet_size < sizeof(*packet) + packet->data_length) {
         nfs_log_error(logger, "Invalid packet size - Got: %d", packet_size);
+        return MYNFS_INVALID_PACKET;
+    }
+
+    if(packet->cmd != MYNFS_CMD_OPEN && client->opened_file_fd < 0) {
+        nfs_log_error(logger, "Attempted to execute command without openning file: %d", packet->cmd);
         return MYNFS_INVALID_PACKET;
     }
 
@@ -108,6 +138,45 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         }
         break;
 
+        case MYNFS_CMD_WRITE: {
+            struct mynfs_write_t* write_data = (struct mynfs_write_t*) packet->data;
+            if(packet->data_length < sizeof(*write_data) 
+                    || packet->data_length < sizeof(*write_data) + write_data->length) {
+                nfs_log_error(logger, "Invalid size of packet mynfs_write_t (%d)", packet->data_length);
+                return MYNFS_INVALID_PACKET;
+            }
+
+            // TODO: Add support for partial write (i.e. ret != write_data->length). Some loop
+            //      or whatever...
+            int ret = write(client->opened_file_fd, write_data->buffer, write_data->length);
+            if(ret < 0) {
+                nfs_log_error(logger, "Failed to write file - errno: %d", errno);
+                return (errno > 0) ? -1 * errno : errno;
+            }
+            return ret;
+        }
+        break;
+
+        case MYNFS_CMD_LSEEK: {
+            struct mynfs_lseek_t* lseek_data = (struct mynfs_lseek_t*) packet->data;
+            if(packet->data_length < sizeof(*lseek_data)) {
+                nfs_log_error(logger, "Invalid size of packet mynfs_lseek_t (%d)", packet->data_length);
+                return MYNFS_INVALID_PACKET;
+            }
+
+            int ret = lseek(client->opened_file_fd, lseek_data->offset, lseek_data->whence);
+            if(ret < 0) {
+                nfs_log_error(logger, "Failed to lseek file - errno: %d", errno);
+                return (errno > 0) ? -1 * errno : errno;
+            }
+            return ret;
+        }
+        break;
+
+        case MYNFS_CMD_CLOSE: {
+            close_client(client);
+            return MYNFS_CLOSED;
+        }
 
         // TODO: the rest
 
@@ -121,7 +190,7 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
     return MYNFS_SUCCESS;
 }
 
-int process_client_message(int socket_fd, char* packet, size_t packet_size, char** response, size_t* response_size) {
+int process_client_message(int socket_fd, void* packet, size_t packet_size, void** response, size_t* response_size) {
     int ret = _process_client_message(socket_fd, packet, packet_size, response, response_size);
     
     if(*response_size == 0) {
@@ -148,28 +217,6 @@ void update_timeout(int socket_fd) {
     // TODO: Update timeout
 }
 
-
-int add_new_client(int socket_fd) {
-    for(int i = 0; i < ARRAY_SIZE(clients); i++) {
-        if(!clients[i].active) {
-            clients[i].active = 1;
-            clients[i].socket_fd = socket_fd;
-            clients[i].opened_file_fd = -1;
-            clients[i].time_left = -1;          // TODO
-
-            return MYNFS_SUCCESS;
-        }
-    }
-
-    nfs_log_error(logger, "Failed to add new client - too many open sessions");
-    return MYNFS_OVERLOAD;
-}
-
-static void close_client(struct client* client) {
-    // TODO:
-    nfs_log_error(logger, "Not implemented yet");
-    return;
-}
 
 void check_timeouts(void) {
     // TODO:
