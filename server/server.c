@@ -95,7 +95,11 @@ int main() {
     nfs_log_open(&logger, "/tmp/test.txt", LOG_LEVEL_INFO, 1);
     nfs_log_info(logger, "Server version V0.1 starting");
 
-    parse_config(fields, 4, "server/example.cfg");
+    int err = parse_config(fields, sizeof(fields) / sizeof(fields[0]), "server/example.cfg");
+    if(err) {
+        nfs_log_error(logger, "Parsing log file failed");
+        return 1;
+    }
     nfs_log_info(logger, "Selected port: %d", port_number);
 
     // create listening socket
