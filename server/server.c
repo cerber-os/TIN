@@ -17,7 +17,6 @@
 #include "packets.h"
 #include "list.h"
 
-#define MAX_FDS 128
 #define MAX_BUF 8192
 #define max(a,b) (((a)>(b)) ? (a):(b))
 
@@ -101,12 +100,11 @@ int main() {
     // create listening socket
     int main_sock, sub_socket, max_fd, ready_sockets, rv;
     struct sockaddr_in server;
-    fd_set ready;
+    fd_set read_fds;
     char **response;
     size_t response_len;
     struct timeval timeout;
     char buffer[MAX_BUF];
-    
     
     main_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (main_sock == -1) 
@@ -131,16 +129,16 @@ int main() {
 
     listen(main_sock, 8);
     do {
-        FD_ZERO(&ready);
+        FD_ZERO(&read_fds);
         temp = sockets_list;
         while(temp->next)
         {
-            FD_SET(temp->fd, &ready);
+            FD_SET(temp->fd, &read_fds);
             temp = temp->next;
         }
         timeout.tv_sec = 5;
         timeout.tv_usec = 0;
-        if((ready_sockets = select(max_fd, &ready, NULL, NULL, &timeout)) == -1) 
+        if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout)) == -1) 
         {
              nfs_log_info(logger, "Failed to select: %s", strerror(errno));
              continue;
@@ -150,25 +148,27 @@ int main() {
             nfs_log_info(logger, "We didn't receive any data. Restarting select...");
             continue;
         }
-        if (FD_ISSET(main_sock, &ready)) 
+        if (FD_ISSET(main_sock, &read_fds)) 
         {
             sub_socket = accept(main_sock, NULL, NULL);
             if (sub_socket == -1)
                 nfs_log_info(logger, "Failed to accept: %s", strerror(errno));
             max_fd = max(max_fd, sub_socket + 1);
-            list_add(sockets_list, sub_socket);
             if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
             {
                 nfs_log_info(logger, "Too many clients connected. Refused new connection.");
                 close(sub_socket);
             }
             else
+            {
+                list_add(sockets_list, sub_socket);
                 nfs_log_info(logger, "New connection accepted");
+            }
         }
         temp = sockets_list->next;
         while(temp->next)
         {
-            if (FD_ISSET(temp->fd, &ready)) 
+            if (FD_ISSET(temp->fd, &read_fds)) 
             {                
                 if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
                 {
@@ -186,6 +186,7 @@ int main() {
                 if(rv == MYNFS_CLOSED)
                 {
                     close(sub_socket);
+                    list_remove_by_fd(&sockets_list, sub_socket);
                     continue;
                 }
                 else
