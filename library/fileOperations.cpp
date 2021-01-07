@@ -15,9 +15,9 @@ char* getIpFromString (string host){
     return (char*)ip.c_str();
 }
 
-int mynfs_open(char *host, char *path, int oflag, int mode){
+int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
 
-    //ogarnianie komunikatu podrzednego
+    //obsluga komunikatu podrzednego
     int path_length = strlen(path);
     int sub_msg_size = sizeof (mynfs_open_t) + path_length + 1;   // +1, bo znak konca null
 
@@ -28,7 +28,7 @@ int mynfs_open(char *host, char *path, int oflag, int mode){
     clientSubMsg->oflag = oflag;
     clientSubMsg->mode = mode;
 
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
@@ -39,22 +39,20 @@ int mynfs_open(char *host, char *path, int oflag, int mode){
 
     mynfs_datagram_t *serverMsg;
 
-    //TODO: ten socketFd trzeba przepropagować w górę
-    int socketFd = createSocket(getIpFromString(string(host)), getPortFromString(string(host)));
-    sendAndGetResponse(socketFd, clientMsg, &serverMsg);
+    *socketFd = createSocket(getIpFromString(string(host)), getPortFromString(string(host)));
+    sendAndGetResponse(*socketFd, clientMsg, &serverMsg);
 
-    // TODO: sprawdzic czy nie trzeba uzyc tu "ntohl"
     return serverMsg->return_value;
 }
 
 
 int mynfs_read(int socketFd, int fd, void *buf, size_t count)
 {
-    //ogarnianie komunikatu podrzednego
+    //obsluga komunikatu podrzednego
     mynfs_read_t clientSubMsg;
     clientSubMsg.length = count;
 
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sizeof(mynfs_read_t));
     memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_read_t));
@@ -68,7 +66,8 @@ int mynfs_read(int socketFd, int fd, void *buf, size_t count)
 
     int len = ntohl(serverMsg->data_length);
     memcpy(buf, serverMsg->data, len);
-    return len;
+    //return len;
+    return serverMsg->return_value;
 }
 
 
@@ -78,14 +77,14 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
 
     int buf_length = strlen(bufor);
     int sub_msg_size = sizeof(mynfs_write_t) + buf_length + 1;
-    //ogarnianie komunikatu podrzednego
+    //obsluga komunikatu podrzednego
    
     mynfs_write_t *clientSubMsg =  (mynfs_write_t *)malloc (sub_msg_size);
     clientSubMsg->length = count;
     strcpy((char*)clientSubMsg->buffer, bufor);
     clientSubMsg->length = buf_length;
  
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
@@ -101,12 +100,12 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
 
 
 off_t mynfs_lseek(int socketFd, int fd, off_t offset, int whence){
-    //ogarnianie komunikatu podrzednego
+    //obsluga komunikatu podrzednego
     mynfs_lseek_t clientSubMsg;
     clientSubMsg.offset = offset;
     clientSubMsg.whence = whence;
 
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sizeof(mynfs_lseek_t));
     memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_lseek_t));
@@ -126,7 +125,7 @@ int mynfs_close(int socketFd, int fd)
 {
     //brak komunikatu podrzednego
 
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t));
 
@@ -137,14 +136,13 @@ int mynfs_close(int socketFd, int fd)
     mynfs_datagram_t *serverMsg;
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
 
-    //TODO: obsluga kodow o bledzie z serwera
-    return 0;   //0 = success
+    return serverMsg->return_value;
 }
 
 
 int mynfs_unlink(char *host, char *pathname)
 {
-    //ogarnianie komunikatu podrzednego
+    //obsluga komunikatu podrzednego
     int path_length = strlen(pathname);
     int sub_msg_size = sizeof (mynfs_unlink_t) + path_length + 1;   // +1, bo znak konca null
 
@@ -153,7 +151,7 @@ int mynfs_unlink(char *host, char *pathname)
     strcpy((char*)clientSubMsg->name, pathname);
     clientSubMsg->path_length = path_length;
 
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
@@ -167,8 +165,7 @@ int mynfs_unlink(char *host, char *pathname)
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
     closeSocket(socketFd);
 
-    // TODO: obsluga kodow bledow z serwera
-    return 0;   //0 = success
+    return serverMsg->return_value;
 }
 
 
@@ -176,7 +173,7 @@ int mynfs_fstat(int socketFd, int fd, struct stat *buf)
 {
     //brak komunikatu podrzednego
     
-    //ogarnianie komunikatu nadrzednego
+    //obsluga komunikatu nadrzednego
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t));
 
@@ -190,6 +187,5 @@ int mynfs_fstat(int socketFd, int fd, struct stat *buf)
     stat *stat_table = (stat *) serverMsg->data;
     memcpy(buf, stat_table, serverMsg->data_length);
 
-    // TODO: obsluga kodow bledow z serwera
-    return 0;   //0 = success
+    return serverMsg->return_value;
 }
