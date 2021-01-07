@@ -10,6 +10,8 @@
 
 #include "../include/packets.h"
 
-int sendMessageAndGetResponse(char *serverIp, uint16_t port, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse);
+int createSocket(char *serverIp, uint16_t port);
+int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse);
+int closeSocket(int socketFd);
 
 #endif //HANDLESOCKETS_H
