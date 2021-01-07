@@ -1,6 +1,7 @@
 #include <security/pam_appl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,11 +9,13 @@
 #include <netdb.h>
 #include <sys/select.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 #include "logger.h"
 #include "config_parser.h"
 #include "client_handle.h"
 #include "packets.h"
+#include "list.h"
 
 #define MAX_FDS 128
 #define MAX_BUF 8192
@@ -96,109 +99,102 @@ int main() {
     nfs_log_info(logger, "Selected port: %d", port_number);
 
     // create listening socket
-    int sock, length;
+    int main_sock, sub_socket, max_fd, ready_sockets, rv;
     struct sockaddr_in server;
     fd_set ready;
+    char **response;
+    size_t response_len;
     struct timeval timeout;
-    int msgsock=-1, nfds, nactive;
-    int sockets_table[MAX_FDS];
-    char buf[MAX_BUF];
-
-    int rval=0, i;
-	for (i=0; i<MAX_FDS; i++) 
-        sockets_table[i]=0;
-
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1) {
-        perror("opening stream socket");
+    char buffer[MAX_BUF];
+    
+    
+    main_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (main_sock == -1) 
+    {
+        nfs_log_info(logger, "Failed to open stream socket: %s", strerror(errno));
         exit(1);
     }
-	nfds = sock+1;
+    else
+	    max_fd = main_sock + 1;
     
-    memset(&server, 0, sizeof(server));
+    bzero(&server, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(hostname);
     server.sin_port = htons(port_number);
-    if (bind(sock, (struct sockaddr *) &server, sizeof server) == -1) 
+    if (bind(main_sock, (struct sockaddr *) &server, sizeof server) == -1) 
     {
-        perror("binding stream socket");
+        nfs_log_info(logger, "Failed to bind stream socket: %s", strerror(errno));
         exit(1);
     }
-    /* wydrukuj na konsoli przydzielony port */
-    length = sizeof( server);
-    if (getsockname(sock,(struct sockaddr *) &server,&length) == -1) {
-        perror("getting socket name");
-        exit(1);
-    }
-    printf("Socket port #%d\n", ntohs(server.sin_port));
 
-    listen(sock, 5);
+    list_node *temp, *sockets_list = list_create(main_sock);
+
+    listen(main_sock, 8);
     do {
         FD_ZERO(&ready);
-        FD_SET(sock, &ready);
-        for (i=0; i<MAX_FDS; i++) /* dodaj aktywne do zbioru */
-            if (sockets_table[i] > 0 )
-                FD_SET(sockets_table[i], &ready);
+        temp = sockets_list;
+        while(temp->next)
+        {
+            FD_SET(temp->fd, &ready);
+            temp = temp->next;
+        }
         timeout.tv_sec = 5;
         timeout.tv_usec = 0;
-        if((nactive=select(nfds, &ready, NULL, NULL, &timeout)) == -1) 
+        if((ready_sockets = select(max_fd, &ready, NULL, NULL, &timeout)) == -1) 
         {
-             perror("select");
+             nfs_log_info(logger, "Failed to select: %s", strerror(errno));
              continue;
         }
- 
-        if (FD_ISSET(sock, &ready)) 
+        if (ready_sockets == 0)
         {
-            msgsock = accept(sock, (struct sockaddr *)0, (int *)0);
-            if (msgsock == -1)
-                perror("accept");
-            nfds=max(nfds, msgsock+1);
-            if(nfds > MAX_FDS)
+            nfs_log_info(logger, "We didn't receive any data. Restarting select...");
+            continue;
+        }
+        if (FD_ISSET(main_sock, &ready)) 
+        {
+            sub_socket = accept(main_sock, NULL, NULL);
+            if (sub_socket == -1)
+                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));
+            max_fd = max(max_fd, sub_socket + 1);
+            list_add(sockets_list, sub_socket);
+            if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
             {
-                perror("accept");
-                close(msgsock);
+                nfs_log_info(logger, "Too many clients connected. Refused new connection.");
+                close(sub_socket);
             }
             else
-            {
-                sockets_table[msgsock]=msgsock;
-                if(add_new_client(msgsock) ==  MYNFS_OVERLOAD)
-                {
-                    perror("add_new_client");
-                    close(msgsock);
-                }
-                else
-                    printf("accepted...\n");
-            }
-        } 
-        for (i=0; i<MAX_FDS; i++)
-            if ((msgsock=sockets_table[i])>0 && FD_ISSET(sockets_table[i], &ready)) 
+                nfs_log_info(logger, "New connection accepted");
+        }
+        temp = sockets_list->next;
+        while(temp->next)
+        {
+            if (FD_ISSET(temp->fd, &ready)) 
             {                
-                if((rval = read(msgsock, buf, MAX_BUF)) == -1)
-                    perror("reading stream message");
-                if (rval == 0) 
+                if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
                 {
-                    printf("Ending connection\n");
-                    close(msgsock);
-                    sockets_table[msgsock] = -1;
+                    nfs_log_info(logger, "Failed to read: %s", strerror(errno));
+                    continue;
+                }   
+                if (rv == 0) 
+                {
+                    nfs_log_info(logger, "Socket was ready to read, but we didn't get any data. Strange!");
                     continue;
                 }
-                char **response = NULL;
-                size_t response_len = 0;
-                int rv = process_client_message(msgsock, buf, rval, response, &response_len);
+                response = NULL;
+                response_len = 0;
+                rv = process_client_message(sub_socket, buffer, rv, (void**) response, &response_len);
                 if(rv == MYNFS_CLOSED)
                 {
-                    close(msgsock);
+                    close(sub_socket);
                     continue;
                 }
                 else
                 {
-                    int send_val = 0;
-                    if((send_val = write(msgsock, response, response_len)) == -1)
-                        perror("writing stream message");
+                    if((rv = write(sub_socket, response, response_len)) == -1)
+                        nfs_log_info(logger, "Failed to write: %s", strerror(errno));
                 }
-                // int isOk = check_credentials("username", "password");
+            }
+            temp = temp->next;
         }
-		if (nactive==0)  
-            printf("Nobody is ready. Restarting select...\n");
     } while(1);
 }
