@@ -25,14 +25,15 @@ struct nfs_logger* logger;
 /*
  * Config file format specifiers
  */
-int port_number, colored_logs;
+int port_number, colored_logs, client_queue;
 char* hostname, * nfs_path;
 
 struct config_field fields[] = {
     {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
-    {.name = "HOSTNAME", .type = CONFIG_TYPE_STRING, .dst = &hostname},
-    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path},
-    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs},
+    {.name = "HOSTNAME", .type = CONFIG_TYPE_STRING, .dst = &hostname, .mandatory = 1},
+    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
+    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs, .mandatory = 1},
+    {.name = "CLIENT_QUEUE", .type = CONFIG_TYPE_INT, .dst = &client_queue, .mandatory = 1},
 };
 
 
@@ -127,7 +128,7 @@ int main() {
 
     list_node *temp, *sockets_list = list_create(main_sock);
 
-    listen(main_sock, 8);
+    listen(main_sock, client_queue);
     do {
         FD_ZERO(&read_fds);
         temp = sockets_list;
