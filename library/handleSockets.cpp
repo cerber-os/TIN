@@ -19,17 +19,20 @@ int createSocket(char *serverIp, uint16_t port) {
         std::cout << "inet_pton error" << std::endl;
         return 1;
     }
+    std::cout<<"Laczenie z serwerem..."<<std::endl;
 
     //Connect socketa
     if (connect(socketFd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         std::cerr << "Error during connection setting" << std::endl;
         return 1;
     }
+    std::cout<<"Polaczono z serwerem..."<<std::endl;
     return socketFd;
 }
 
 int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse){
     //Wysylanie requesta do serwera
+    std::cout<<"Wysylanie do serwera za pomoca write..."<<std::endl;
     write(socketFd, clientRequest, sizeof(mynfs_datagram_t) + clientRequest->data_length);
 
     //Odbieranie response z serwera

@@ -1,18 +1,18 @@
 #include "fileOperations.h"
 using namespace std;
 
-int getPortFromString(string host){
+uint16_t getPortFromString(string host){
     size_t pos = host.find_last_of(':');
     string port = host.substr(pos + 1, host.length() - 1);
     cout<< port<< endl;
-    return stoi( port );
+    return (uint16_t)stoul( port );
 }
 
-char* getIpFromString (string host){
+string getIpFromString (string host){
     size_t pos = host.find_last_of(':');
     string ip = host.substr(0, pos);
     cout<< ip<< endl;
-    return (char*)ip.c_str();
+    return ip;
 }
 
 int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
@@ -39,7 +39,7 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
 
     mynfs_datagram_t *serverMsg;
 
-    *socketFd = createSocket(getIpFromString(string(host)), getPortFromString(string(host)));
+    *socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
     sendAndGetResponse(*socketFd, clientMsg, &serverMsg);
 
     return serverMsg->return_value;
@@ -117,7 +117,6 @@ off_t mynfs_lseek(int socketFd, int fd, off_t offset, int whence){
     mynfs_datagram_t *serverMsg;
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
 
-    // return value powinno byc offsetem
     return serverMsg->return_value;
 }
 
@@ -161,7 +160,7 @@ int mynfs_unlink(char *host, char *pathname)
     clientMsg->data_length = sub_msg_size;
 
     mynfs_datagram_t *serverMsg;
-    int socketFd = createSocket(getIpFromString(string(host)), getPortFromString(string(host)));
+    int socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
     closeSocket(socketFd);
 

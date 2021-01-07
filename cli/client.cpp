@@ -63,7 +63,7 @@ int nfsread(std::string &host, std::vector<int16_t> &openedDescriptors)
     std::getline(std::cin, scount);
     count = static_cast<int16_t>(std::stoi(scount));
 
-    int16_t size = mynfs_read((char*)getIp(host).c_str(), getPort(host),fd, pBuf, count);
+    int16_t size = mynfs_read(0, fd, pBuf, count);
 
     std::cout << "Success" << std::endl;
     std::cout << size << " bytes read" << std::endl;
@@ -114,7 +114,8 @@ int nfsopen(std::string &host, std::vector<int16_t> &openedDescriptors)
         }
     }
 
-    int fd = mynfs_open((char*)getIp(host).c_str(),getPort(host), (char*)path.c_str(), oflag, 0);  //TODO: co z mode?
+    int socketFd;
+    int fd = mynfs_open((char*)(host).c_str(), (char*)path.c_str(), oflag, 0, &socketFd);  //TODO: co z mode?
     std::cout << "Success" << std::endl;
     std::cout << "Opened file descriptor: " << fd << std::endl;
     openedDescriptors.push_back(fd);
@@ -147,7 +148,7 @@ int nfswrite(std::string &host, std::vector<int16_t> &openedDescriptors)
     void *pBuf = byteArray;
     count = static_cast<int16_t>(buf.length());
 
-    int16_t size = mynfs_write((char*)getIp(host).c_str(),getPort(host), fd, pBuf, count);
+    int16_t size = mynfs_write(0, fd, pBuf, count);
     //int16_t size = mynfs_write( fd, pBuf, count);
     std::cout << "Success" << std::endl;
     std::cout << size << " bytes written" << std::endl;
@@ -198,7 +199,7 @@ int nfslseek(std::string &host, std::vector<int16_t> &openedDescriptors)
         return -1;
     }
 
-    offset = mynfs_lseek((char*)getIp(host).c_str(),getPort(host), fd, offset, whence);
+    offset = mynfs_lseek(0, fd, offset, whence);
 
     std::cout << "Success" << std::endl;
     std::cout << "New offset: " << offset << std::endl;
@@ -221,7 +222,7 @@ int nfsclose(std::string &host, std::vector<int16_t> &openedDescriptors)
         return -1;
     }
 
-    mynfs_close((char*)getIp(host).c_str(),getPort(host), fd);
+    mynfs_close(0, fd);
 
 
     openedDescriptors.erase(std::remove(openedDescriptors.begin(), openedDescriptors.end(), fd),
@@ -235,7 +236,7 @@ int nfsunlink(std::string &host)
     std::string path;
     std::cout << "Path to file:" << std::endl;
     std::getline(std::cin, path);
-    mynfs_unlink((char*)getIp(host).c_str(),getPort(host), (char*)path.c_str());
+    mynfs_unlink((char*)(host).c_str(), (char*)path.c_str());
     std::cout << "Success" << std::endl;
     return 0;
 }
