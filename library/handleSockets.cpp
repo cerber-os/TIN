@@ -33,7 +33,7 @@ int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_data
     write(socketFd, clientRequest, sizeof(mynfs_datagram_t) + clientRequest->data_length);
 
     //Odbieranie response z serwera
-    char response[4000];       //4000 tymczasowy limit przeslanych bajtow
+    char response[4000];       //4000 limit przeslanych bajtow
     read(socketFd, response, 4000);
 
     (*serverResponse) = (mynfs_datagram_t *) response;

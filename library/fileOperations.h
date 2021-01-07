@@ -7,9 +7,7 @@
 #include "../include/packets.h"
 #include "handleSockets.h"
 
-//Argumenty sa takie same jak w zwyklych linuxowych wersjach tych funkcji + char *host, int port
-
-int mynfs_open(char *host, char *path, int oflag, int mode);
+int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd);
 int mynfs_read(int socketFd, int fd, void *buf, size_t count);
 ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count);
 off_t mynfs_lseek(int socketFd, int fd, off_t offset, int whence);
