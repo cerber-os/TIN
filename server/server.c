@@ -135,11 +135,12 @@ int main() {
     listen(main_sock, client_queue);
     do {
         FD_ZERO(&read_fds);
+        FD_SET(sockets_list->fd, &read_fds);
         temp = sockets_list;
         while(temp->next)
         {
-            FD_SET(temp->fd, &read_fds);
             temp = temp->next;
+            FD_SET(temp->fd, &read_fds);
         }
         timeout.tv_sec = 5;
         timeout.tv_usec = 0;
@@ -173,9 +174,10 @@ int main() {
             if (sub_socket == -1)
                 nfs_log_info(logger, "Failed to accept: %s", strerror(errno));  
         }
-        temp = sockets_list->next;
+        temp = sockets_list;
         while(temp->next)
         {
+            temp = temp->next;
             if (FD_ISSET(temp->fd, &read_fds)) 
             {                
                 if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
@@ -203,7 +205,6 @@ int main() {
                         nfs_log_info(logger, "Failed to write: %s", strerror(errno));
                 }
             }
-            temp = temp->next;
         }
     } while(1);
 }
