@@ -92,16 +92,16 @@ void getDataFromSocket(int new_socket) {
     // std::cout<<"* Path name: "<< inner_message->name <<std::endl;
 
     //ten fragment jest tylko do komendy open 
-    // mynfs_open_t *inner_message = (mynfs_open_t *) received_message->data;
-    // std::cout<<"* Path length: "<< inner_message->path_length <<std::endl;
-    // std::cout<<"* Path name: "<< inner_message->name <<std::endl;
-    // std::cout<<"* Oflag: "<< inner_message->oflag <<std::endl;
-    // std::cout<<"* Mode: "<< inner_message->mode <<std::endl;
+    mynfs_open_t *inner_message = (mynfs_open_t *) received_message->data;
+    std::cout<<"* Path length: "<< inner_message->path_length <<std::endl;
+    std::cout<<"* Path name: "<< inner_message->name <<std::endl;
+    std::cout<<"* Oflag: "<< inner_message->oflag <<std::endl;
+    std::cout<<"* Mode: "<< inner_message->mode <<std::endl;
 
     //ten fragment jest tylko do komendy write 
-    mynfs_write_t *inner_message = (mynfs_write_t *) received_message->data;
-    std::cout<<"* Buffer length: "<< inner_message->length <<std::endl;
-    std::cout<<"* Buffer content: "<< inner_message->buffer <<std::endl;
+    // mynfs_write_t *inner_message = (mynfs_write_t *) received_message->data;
+    // std::cout<<"* Buffer length: "<< inner_message->length <<std::endl;
+    // std::cout<<"* Buffer content: "<< inner_message->buffer <<std::endl;
 
     std::cout.flush();
 }
