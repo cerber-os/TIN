@@ -1,6 +1,7 @@
 #include <security/pam_appl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,11 +9,15 @@
 #include <netdb.h>
 #include <sys/select.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 #include "logger.h"
 #include "config_parser.h"
+#include "client_handle.h"
+#include "packets.h"
+#include "list.h"
 
-#define MAX_FDS 128
+#define MAX_BUF 8192
 #define max(a,b) (((a)>(b)) ? (a):(b))
 
 struct nfs_logger* logger;
@@ -93,101 +98,104 @@ int main() {
     nfs_log_info(logger, "Selected port: %d", port_number);
 
     // create listening socket
-    int sock, length;
+    int main_sock, sub_socket, max_fd, ready_sockets, rv;
     struct sockaddr_in server;
-    fd_set ready;
+    fd_set read_fds;
+    char **response;
+    size_t response_len;
     struct timeval timeout;
-    int msgsock=-1, nfds, nactive;
-    int sockets_table[MAX_FDS];
-
-    int rval=0, i;
-	for (i=0; i<MAX_FDS; i++) 
-        sockets_table[i]=0;
-
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1) {
-        perror("opening stream socket");
+    char buffer[MAX_BUF];
+    
+    main_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (main_sock == -1) 
+    {
+        nfs_log_info(logger, "Failed to open stream socket: %s", strerror(errno));
         exit(1);
     }
-	nfds = sock+1;
+    else
+	    max_fd = main_sock + 1;
     
-    memset(&server, 0, sizeof(server));
+    bzero(&server, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(hostname);
     server.sin_port = htons(port_number);
-    if (bind(sock, (struct sockaddr *) &server, sizeof server) == -1) 
+    if (bind(main_sock, (struct sockaddr *) &server, sizeof server) == -1) 
     {
-        perror("binding stream socket");
+        nfs_log_info(logger, "Failed to bind stream socket: %s", strerror(errno));
         exit(1);
     }
-    /* wydrukuj na konsoli przydzielony port */
-    length = sizeof( server);
-    if (getsockname(sock,(struct sockaddr *) &server,&length) == -1) {
-        perror("getting socket name");
-        exit(1);
-    }
-    printf("Socket port #%d\n", ntohs(server.sin_port));
 
-    listen(sock, 5);
+    list_node *temp, *sockets_list = list_create(main_sock);
+
+    listen(main_sock, 8);
     do {
-        FD_ZERO(&ready);
-        FD_SET(sock, &ready);
-        for (i=0; i<MAX_FDS; i++) /* dodaj aktywne do zbioru */
-            if (sockets_table[i] > 0 )
-                FD_SET(sockets_table[i], &ready);
+        FD_ZERO(&read_fds);
+        temp = sockets_list;
+        while(temp->next)
+        {
+            FD_SET(temp->fd, &read_fds);
+            temp = temp->next;
+        }
         timeout.tv_sec = 5;
         timeout.tv_usec = 0;
-        if((nactive=select(nfds, &ready, NULL, NULL, &timeout)) == -1) 
+        if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout)) == -1) 
         {
-             perror("select");
+             nfs_log_info(logger, "Failed to select: %s", strerror(errno));
              continue;
         }
- 
-        if (FD_ISSET(sock, &ready)) 
+        if (ready_sockets == 0)
         {
-            msgsock = accept(sock, (struct sockaddr *)0, (int *)0);
-            if (msgsock == -1)
-                perror("accept");
-            nfds=max(nfds, msgsock+1);
-            if(nfds > MAX_FDS)
-                perror("accept");
+            nfs_log_info(logger, "We didn't receive any data. Restarting select...");
+            continue;
+        }
+        if (FD_ISSET(main_sock, &read_fds)) 
+        {
+            sub_socket = accept(main_sock, NULL, NULL);
+            if (sub_socket == -1)
+                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));
+            max_fd = max(max_fd, sub_socket + 1);
+            if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
+            {
+                nfs_log_info(logger, "Too many clients connected. Refused new connection.");
+                close(sub_socket);
+            }
             else
             {
-                sockets_table[msgsock]=msgsock;
-                printf("accepted...\n");
+                list_add(sockets_list, sub_socket);
+                nfs_log_info(logger, "New connection accepted");
             }
-        } 
-        for (i=0; i<MAX_FDS; i++)
-            if ((msgsock=sockets_table[i])>0 && FD_ISSET(sockets_table[i], &ready)) 
-            {
-                /*
-                Tutaj obsługujemy żadania od klientów.
-                Czyli najpierw musimy zrobić read'a, aby wiedzieć czego chca
-                */
-                
-                if((rval = read(msgsock, NULL, 0)) == -1)
-                    perror("reading stream message");
-
-                /*
-                Po zrobienie read'a wiemy co od nas klient chce.
-                Jeśli chce sie zalogować to linijka niżej pokazuje przykład
-                */
-                int isOk = check_credentials("username", "password");
-
-                // ponizej jest kod ktory sprawdza czy cokolwiek odczytalismy
-                if (rval == 0) 
+        }
+        temp = sockets_list->next;
+        while(temp->next)
+        {
+            if (FD_ISSET(temp->fd, &read_fds)) 
+            {                
+                if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
                 {
-                    printf("Ending connection\n");
-                    close( msgsock );
-                    sockets_table[msgsock] = -1; 
+                    nfs_log_info(logger, "Failed to read: %s", strerror(errno));
+                    continue;
+                }   
+                if (rv == 0) 
+                {
+                    nfs_log_info(logger, "Socket was ready to read, but we didn't get any data. Strange!");
+                    continue;
+                }
+                response = NULL;
+                response_len = 0;
+                rv = process_client_message(sub_socket, buffer, rv, (void**) response, &response_len);
+                if(rv == MYNFS_CLOSED)
+                {
+                    close(sub_socket);
+                    list_remove_by_fd(&sockets_list, sub_socket);
+                    continue;
                 }
                 else
-                    continue;
-                
-                /* No i tutaj musimy wrzucic jakiegos handlera.
-                Jeszcze nie wiem jak on bedzie wygladac wiec pozostawiam komentarz */
+                {
+                    if((rv = write(sub_socket, response, response_len)) == -1)
+                        nfs_log_info(logger, "Failed to write: %s", strerror(errno));
+                }
+            }
+            temp = temp->next;
         }
-		if (nactive==0)  
-            printf("Noone is ready. Restarting select...\n");
     } while(1);
 }

@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "client_handle.h"
 #include "logger.h"
@@ -10,7 +11,7 @@
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 extern struct nfs_logger* logger;
-
+struct client clients[MAX_CLIENTS_COUNT];
 
 static struct client* get_client_by_socket(int socket_fd) {
     for(int i = 0; i < ARRAY_SIZE(clients); i++)
@@ -25,7 +26,7 @@ int add_new_client(int socket_fd) {
             clients[i].active = 1;
             clients[i].socket_fd = socket_fd;
             clients[i].opened_file_fd = -1;
-            clients[i].time_left = -1;          // TODO
+            update_timeout(socket_fd);
 
             return MYNFS_SUCCESS;
         }
@@ -36,9 +37,9 @@ int add_new_client(int socket_fd) {
 }
 
 static void close_client(struct client* client) {
-    // TODO:
-    nfs_log_error(logger, "Not implemented yet");
-    return;
+    close(client->opened_file_fd);
+    client->opened_file_fd = -1;
+    client->active = 0;
 }
 
 
@@ -149,14 +150,18 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
                 return MYNFS_INVALID_PACKET;
             }
 
-            // TODO: Add support for partial write (i.e. ret != write_data->length). Some loop
-            //      or whatever...
-            int ret = write(client->opened_file_fd, write_data->buffer, write_data->length);
-            if(ret < 0) {
-                nfs_log_error(logger, "Failed to write file - errno: %d", errno);
-                return (errno > 0) ? -1 * errno : errno;
+            size_t current_pos = 0;
+            while(current_pos < write_data->length) {
+                int ret = write(client->opened_file_fd, write_data->buffer + current_pos, write_data->length - current_pos);
+                if(ret < 0) {
+                    nfs_log_error(logger, "Failed to write file - errno: %d", errno);
+                    return (errno > 0) ? -1 * errno : errno;
+                }
+
+                current_pos += ret;
             }
-            return ret;
+
+            return current_pos;
         }
         break;
 
@@ -177,13 +182,13 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         break;
 
         case MYNFS_CMD_FSTAT: {
-            //int fstat(int fd, struct stat *buf);
             if(packet->data_length != 0)
                 nfs_log_warn(logger, "Expected packet to be empty for FSTAT command, but size is '%d'", packet->data_length);
             
             *response = calloc(1, sizeof(struct stat));
             if(*response == NULL) {
-                // TODO: Error handling ...
+                nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
+                return MYNFS_OVERLOAD;
             }
 
             int ret = fstat(client->opened_file_fd, (struct stat *)*response);
@@ -245,7 +250,9 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
     } else {
         struct mynfs_datagram_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
         if(full_packet == NULL) {
-            // TODO: Error handling...
+            nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
+            *response = *response_size = 0;
+            return MYNFS_OVERLOAD;
         }
 
         full_packet->return_value = ret;
@@ -261,12 +268,20 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
 
 
 void update_timeout(int socket_fd) {
-    // TODO: Update timeout
+    struct client* client = get_client_by_socket(socket_fd);
+    if(client == NULL)
+        return;
+    client->time_left = time(NULL) + CLIENT_TIMEOUT_VALUE;
 }
 
 
-void check_timeouts(void) {
-    // TODO:
-    return;
+int check_timeouts(void) {
+    unsigned long current_time = time(NULL);
+    for(int i = 0; i < ARRAY_SIZE(clients); i++)
+        if(clients[i].active && clients[i].time_left < current_time) {
+            close_client(&clients[i]);
+            return clients[i].socket_fd;
+        }
+    return -1;
 }
 
