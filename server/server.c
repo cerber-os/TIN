@@ -151,20 +151,23 @@ int main() {
         }
         if (FD_ISSET(main_sock, &read_fds)) 
         {
-            sub_socket = accept(main_sock, NULL, NULL);
+            while((sub_socket = accept(main_sock, NULL, NULL)) != -1)
+            {
+                max_fd = max(max_fd, sub_socket + 1);
+                if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
+                {
+                    nfs_log_info(logger, "Too many clients connected. Refused new connection.");
+                    close(sub_socket);
+                    break;
+                }
+                else
+                {
+                    list_add(sockets_list, sub_socket);
+                    nfs_log_info(logger, "New connection accepted");
+                }
+            }
             if (sub_socket == -1)
-                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));
-            max_fd = max(max_fd, sub_socket + 1);
-            if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
-            {
-                nfs_log_info(logger, "Too many clients connected. Refused new connection.");
-                close(sub_socket);
-            }
-            else
-            {
-                list_add(sockets_list, sub_socket);
-                nfs_log_info(logger, "New connection accepted");
-            }
+                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));  
         }
         temp = sockets_list->next;
         while(temp->next)
