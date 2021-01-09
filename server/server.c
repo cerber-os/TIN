@@ -25,15 +25,17 @@ struct nfs_logger* logger;
 /*
  * Config file format specifiers
  */
-int port_number, colored_logs, client_queue;
-char* hostname, * nfs_path;
+int port_number, colored_logs, client_queue, log_level;
+char* hostname, * nfs_path, * log_file_location;
 
 struct config_field fields[] = {
-    {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
     {.name = "HOSTNAME", .type = CONFIG_TYPE_STRING, .dst = &hostname, .mandatory = 1},
-    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
-    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs, .mandatory = 1},
+    {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
     {.name = "CLIENT_QUEUE", .type = CONFIG_TYPE_INT, .dst = &client_queue, .mandatory = 1},
+    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
+    {.name = "LOG_FILE", .type = CONFIG_TYPE_STRING, .dst = &log_file_location, .mandatory = 1},
+    {.name = "LOG_LEVEL", .type = CONFIG_TYPE_INT, .dst = &log_level},
+    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs},
 };
 
 
@@ -91,16 +93,28 @@ err:
 /*
  * Main network filesystem (NFS) server logic
  */
-int main() {
-    nfs_log_open(&logger, "/tmp/test.txt", LOG_LEVEL_INFO, 1);
-    nfs_log_info(logger, "Server version V0.1 starting");
+int main(int argc, char** argv) {
+    nfs_log_open(&logger, NULL, LOG_LEVEL_INFO, 1);
+    nfs_log_info(logger, "myNFS server (V0.1)");
 
-    int err = parse_config(fields, sizeof(fields) / sizeof(fields[0]), "server/example.cfg");
+    char* config_file = "./server/example.cfg";
+    if(argc < 2) {
+        nfs_log_warn(logger, "No location of configuration file provided in argv[1] ...");
+        nfs_log_info(logger, "... will use `./server/example.cfg` instead");
+    } else {
+        config_file = argv[1];
+        nfs_log_info(logger, "Reading config file from `%s`", config_file);
+    }
+
+    int err = parse_config(fields, sizeof(fields) / sizeof(fields[0]), config_file);
     if(err) {
         nfs_log_error(logger, "Parsing log file failed");
         return 1;
     }
-    nfs_log_info(logger, "Selected port: %d", port_number);
+
+    // Reopen logger after configuration has been read from config file
+    nfs_log_close(logger);
+    nfs_log_open(&logger, log_file_location, log_level, colored_logs);
 
     // create listening socket
     int main_sock, sub_socket, max_fd, ready_sockets, rv;
@@ -114,7 +128,7 @@ int main() {
     main_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (main_sock == -1) 
     {
-        nfs_log_info(logger, "Failed to open stream socket: %s", strerror(errno));
+        nfs_log_error(logger, "Failed to open stream socket: %s", strerror(errno));
         exit(1);
     }
     else
@@ -126,9 +140,11 @@ int main() {
     server.sin_port = htons(port_number);
     if (bind(main_sock, (struct sockaddr *) &server, sizeof server) == -1) 
     {
-        nfs_log_info(logger, "Failed to bind stream socket: %s", strerror(errno));
+        nfs_log_error(logger, "Failed to bind stream socket: %s", strerror(errno));
         exit(1);
     }
+
+    nfs_log_info(logger, "Listening on port %d...", port_number);
 
     list_node *temp, *sockets_list = list_create(main_sock);
 
@@ -146,12 +162,12 @@ int main() {
         timeout.tv_usec = 0;
         if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout)) == -1) 
         {
-             nfs_log_info(logger, "Failed to select: %s", strerror(errno));
+             nfs_log_error(logger, "Failed to select: %s", strerror(errno));
              continue;
         }
         if (ready_sockets == 0)
         {
-            nfs_log_info(logger, "We didn't receive any data. Restarting select...");
+            nfs_log_debug(logger, "We didn't receive any data. Restarting select...");
             continue;
         }
         if (FD_ISSET(main_sock, &read_fds)) 
@@ -161,7 +177,7 @@ int main() {
                 max_fd = max(max_fd, sub_socket + 1);
                 if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
                 {
-                    nfs_log_info(logger, "Too many clients connected. Refused new connection.");
+                    nfs_log_warn(logger, "Too many clients connected. Refused new connection.");
                     close(sub_socket);
                     break;
                 }
@@ -172,39 +188,54 @@ int main() {
                 }
             }
             if (sub_socket == -1)
-                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));  
+                nfs_log_error(logger, "Failed to accept: %s", strerror(errno));
         }
         temp = sockets_list;
         while(temp->next)
         {
             temp = temp->next;
             if (FD_ISSET(temp->fd, &read_fds)) 
-            {                
+            {
                 if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
                 {
-                    nfs_log_info(logger, "Failed to read: %s", strerror(errno));
+                    nfs_log_error(logger, "Failed to read: %s", strerror(errno));
                     continue;
                 }   
                 if (rv == 0) 
                 {
-                    nfs_log_info(logger, "Socket was ready to read, but we didn't get any data. Strange!");
+                    nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Strange!");
                     continue;
                 }
+
+                update_timeout(sub_socket);
+
                 response = NULL;
                 response_len = 0;
                 rv = process_client_message(sub_socket, buffer, rv, (void**) response, &response_len);
                 if(rv == MYNFS_CLOSED)
                 {
+                    free(response);
                     close(sub_socket);
                     list_remove_by_fd(&sockets_list, sub_socket);
+                    nfs_log_info(logger, "Connection with remote client closed");
                     continue;
                 }
                 else
                 {
                     if((rv = write(sub_socket, response, response_len)) == -1)
-                        nfs_log_info(logger, "Failed to write: %s", strerror(errno));
+                        nfs_log_error(logger, "Failed to write: %s", strerror(errno));
+
+                    free(response);
                 }
             }
+        }
+
+        // Monitor for timeouts
+        int timedout_client_fd = check_timeouts();
+        if(timedout_client_fd >= 0) {
+            close(timedout_client_fd);
+            list_remove_by_fd(&sockets_list, timedout_client_fd);
+            nfs_log_info(logger, "Disconnected client - timeout");
         }
     } while(1);
 }
