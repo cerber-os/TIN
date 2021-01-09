@@ -114,7 +114,7 @@ int main() {
     main_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (main_sock == -1) 
     {
-        nfs_log_info(logger, "Failed to open stream socket: %s", strerror(errno));
+        nfs_log_error(logger, "Failed to open stream socket: %s", strerror(errno));
         exit(1);
     }
     else
@@ -126,7 +126,7 @@ int main() {
     server.sin_port = htons(port_number);
     if (bind(main_sock, (struct sockaddr *) &server, sizeof server) == -1) 
     {
-        nfs_log_info(logger, "Failed to bind stream socket: %s", strerror(errno));
+        nfs_log_error(logger, "Failed to bind stream socket: %s", strerror(errno));
         exit(1);
     }
 
@@ -146,12 +146,12 @@ int main() {
         timeout.tv_usec = 0;
         if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout)) == -1) 
         {
-             nfs_log_info(logger, "Failed to select: %s", strerror(errno));
+             nfs_log_error(logger, "Failed to select: %s", strerror(errno));
              continue;
         }
         if (ready_sockets == 0)
         {
-            nfs_log_info(logger, "We didn't receive any data. Restarting select...");
+            // nfs_log_info(logger, "We didn't receive any data. Restarting select...");
             continue;
         }
         if (FD_ISSET(main_sock, &read_fds)) 
@@ -161,7 +161,7 @@ int main() {
                 max_fd = max(max_fd, sub_socket + 1);
                 if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
                 {
-                    nfs_log_info(logger, "Too many clients connected. Refused new connection.");
+                    nfs_log_warn(logger, "Too many clients connected. Refused new connection.");
                     close(sub_socket);
                     break;
                 }
@@ -172,7 +172,7 @@ int main() {
                 }
             }
             if (sub_socket == -1)
-                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));  
+                nfs_log_error(logger, "Failed to accept: %s", strerror(errno));
         }
         temp = sockets_list;
         while(temp->next)
@@ -182,12 +182,12 @@ int main() {
             {                
                 if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
                 {
-                    nfs_log_info(logger, "Failed to read: %s", strerror(errno));
+                    nfs_log_error(logger, "Failed to read: %s", strerror(errno));
                     continue;
                 }   
                 if (rv == 0) 
                 {
-                    nfs_log_info(logger, "Socket was ready to read, but we didn't get any data. Strange!");
+                    nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Strange!");
                     continue;
                 }
                 response = NULL;
@@ -197,12 +197,13 @@ int main() {
                 {
                     close(sub_socket);
                     list_remove_by_fd(&sockets_list, sub_socket);
+                    nfs_log_info(logger, "Connection with remote client closed");
                     continue;
                 }
                 else
                 {
                     if((rv = write(sub_socket, response, response_len)) == -1)
-                        nfs_log_info(logger, "Failed to write: %s", strerror(errno));
+                        nfs_log_error(logger, "Failed to write: %s", strerror(errno));
                 }
             }
         }
