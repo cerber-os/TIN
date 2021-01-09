@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -116,6 +117,7 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
 
     switch(packet->cmd) {
         case MYNFS_CMD_OPEN: {
+            int lock_file = 0;
             struct mynfs_open_t* open_data = (struct mynfs_open_t*) packet->data;
             if(packet->data_length < sizeof(*open_data) 
                     || packet->data_length < sizeof(*open_data) + open_data->path_length) {
@@ -137,14 +139,33 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             }
             free(path_name);
 
-            client->opened_file_fd = open(path_name, open_data->oflag, open_data->mode);
+            // Handle lock flag
+            if(open_data->oflag & O_MYNFS_LOCK) {
+                nfs_log_debug(logger, "File lock has been requested by the client");
+                lock_file = 1;
+                open_data->oflag &= ~O_MYNFS_LOCK;
+            }
+
+            client->opened_file_fd = open(sanitized_path, open_data->oflag, open_data->mode);
             if(client->opened_file_fd < 0) {
                 nfs_log_error(logger, "Failed to open file `%s` - errno: %d", path_name, errno);
                 free(sanitized_path);
                 return (errno > 0) ? -1 * errno : errno;
             }
-
             free(sanitized_path);
+
+            if(lock_file) {
+                int ret = flock(client->opened_file_fd, LOCK_EX | LOCK_NB);
+                if(ret < 0) {
+                    if(errno == EWOULDBLOCK) {
+                        nfs_log_debug(logger, "Failed to lock file - file is already locked");
+                        return MYNFS_ALREADY_LOCKED;
+                    } else {
+                        nfs_log_error(logger, "Failed to lock file - flock returned %s", strerror(errno));
+                        return (errno > 0) ? -1 * errno : errno;
+                    }
+                }
+            }
         }
         break;
     
