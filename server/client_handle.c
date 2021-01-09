@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -11,7 +12,34 @@
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 extern struct nfs_logger* logger;
+extern char* nfs_path;
 struct client clients[MAX_CLIENTS_COUNT];
+
+char* sanitize_path(char* path) {
+    size_t path_length = strlen(path);
+    size_t nfs_path_length = strlen(nfs_path);
+
+    char* combined_path = calloc(1, path_length + nfs_path_length + 2);
+    strcpy(combined_path, nfs_path);
+    combined_path[nfs_path_length] = '/';
+    strncpy(&combined_path[nfs_path_length + 1], path, path_length);
+
+    char* normalized_path = realpath(combined_path, NULL);
+    if(normalized_path == NULL) {
+        nfs_log_error(logger, "User provided path cannot be normalized - %s", strerror(errno));
+        free(combined_path);
+        return NULL;
+    }
+    free(combined_path);
+
+    // Check whether normalized path starts with path to the shared directory
+    if(strncmp(normalized_path, nfs_path, nfs_path_length - 1)) {
+        free(normalized_path);
+        return NULL;
+    }
+
+    return normalized_path;
+}
 
 static struct client* get_client_by_socket(int socket_fd) {
     for(int i = 0; i < ARRAY_SIZE(clients); i++)
@@ -100,18 +128,23 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             }
 
             char* path_name = strndup((char*)open_data->name, open_data->path_length);
-            // TODO: Sanitize path_name
+            char* sanitized_path = sanitize_path(path_name);
+
+            if(sanitized_path == NULL) {
+                nfs_log_error(logger, "User provided path is invalid - %s", path_name);
+                free(path_name);
+                return MYNFS_INVALID_PATH;
+            }
+            free(path_name);
 
             client->opened_file_fd = open(path_name, open_data->oflag, open_data->mode);
             if(client->opened_file_fd < 0) {
                 nfs_log_error(logger, "Failed to open file `%s` - errno: %d", path_name, errno);
-                free(path_name);
+                free(sanitized_path);
                 return (errno > 0) ? -1 * errno : errno;
             }
 
-            // TODO: chown
-
-            free(path_name);
+            free(sanitized_path);
         }
         break;
     
@@ -212,10 +245,16 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             }
 
             char* path_name = strndup((char*)unlink_data->name, unlink_data->path_length);
-            // TODO: Sanitize path_name
+            char* sanitized_path = sanitize_path(path_name);
+            if(sanitized_path == NULL) {
+                nfs_log_error(logger, "User provided path is invalid - %s", path_name);
+                free(path_name);
+                return MYNFS_INVALID_PATH;
+            }
+            free(path_name);
+
 
             int ret = unlink(path_name);
-
             if(ret < 0) {
                 nfs_log_error(logger, "Failed to unlink file `%s` - errno: %d", path_name, errno);
                 free(path_name);

@@ -17,9 +17,10 @@ enum mynfs_error_code {
     MYNFS_UNKNOWN_COMMAND,
     MYNFS_ALREADY_OPENED,
     MYNFS_OVERLOAD,
+    MYNFS_INVALID_PATH,
 
     // Others
-    MYNFS_CLOSED            = 100,
+    MYNFS_CLOSED            = -100,
 
     // Success
     MYNFS_SUCCESS           = 0,
