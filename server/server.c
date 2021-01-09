@@ -25,15 +25,17 @@ struct nfs_logger* logger;
 /*
  * Config file format specifiers
  */
-int port_number, colored_logs, client_queue;
-char* hostname, * nfs_path;
+int port_number, colored_logs, client_queue, log_level;
+char* hostname, * nfs_path, * log_file_location;
 
 struct config_field fields[] = {
-    {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
     {.name = "HOSTNAME", .type = CONFIG_TYPE_STRING, .dst = &hostname, .mandatory = 1},
-    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
-    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs, .mandatory = 1},
+    {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
     {.name = "CLIENT_QUEUE", .type = CONFIG_TYPE_INT, .dst = &client_queue, .mandatory = 1},
+    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
+    {.name = "LOG_FILE", .type = CONFIG_TYPE_STRING, .dst = &log_file_location, .mandatory = 1},
+    {.name = "LOG_LEVEL", .type = CONFIG_TYPE_INT, .dst = &log_level},
+    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs},
 };
 
 
@@ -91,16 +93,28 @@ err:
 /*
  * Main network filesystem (NFS) server logic
  */
-int main() {
-    nfs_log_open(&logger, "/tmp/test.txt", LOG_LEVEL_INFO, 1);
-    nfs_log_info(logger, "Server version V0.1 starting");
+int main(int argc, char** argv) {
+    nfs_log_open(&logger, NULL, LOG_LEVEL_INFO, 1);
+    nfs_log_info(logger, "myNFS server (V0.1)");
 
-    int err = parse_config(fields, sizeof(fields) / sizeof(fields[0]), "server/example.cfg");
+    char* config_file = "./server/example.cfg";
+    if(argc < 2) {
+        nfs_log_warn(logger, "No location of configuration file provided in argv[1]");
+        nfs_log_info(logger, "will use `./server/example.cfg` instead");
+    } else {
+        config_file = argv[1];
+        nfs_log_info(logger, "Reading config file from `%s`", config_file);
+    }
+
+    int err = parse_config(fields, sizeof(fields) / sizeof(fields[0]), config_file);
     if(err) {
         nfs_log_error(logger, "Parsing log file failed");
         return 1;
     }
-    nfs_log_info(logger, "Selected port: %d", port_number);
+
+    // Reopen logger after configuration has been read from config file
+    nfs_log_close(logger);
+    nfs_log_open(&logger, log_file_location, log_level, colored_logs);
 
     // create listening socket
     int main_sock, sub_socket, max_fd, ready_sockets, rv;
@@ -130,6 +144,8 @@ int main() {
         exit(1);
     }
 
+    nfs_log_info(logger, "Listening on port %d...", port_number);
+
     list_node *temp, *sockets_list = list_create(main_sock);
 
     listen(main_sock, client_queue);
@@ -151,7 +167,7 @@ int main() {
         }
         if (ready_sockets == 0)
         {
-            // nfs_log_info(logger, "We didn't receive any data. Restarting select...");
+            nfs_log_debug(logger, "We didn't receive any data. Restarting select...");
             continue;
         }
         if (FD_ISSET(main_sock, &read_fds)) 
