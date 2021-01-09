@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
     int main_sock, sub_socket, max_fd, ready_sockets, rv;
     struct sockaddr_in server;
     fd_set read_fds;
-    char **response;
+    char *response;
     size_t response_len;
     struct timeval timeout;
     char buffer[MAX_BUF];
@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
 
                 response = NULL;
                 response_len = 0;
-                rv = process_client_message(sub_socket, buffer, rv, (void**) response, &response_len);
+                rv = process_client_message(sub_socket, buffer, rv, (void**) &response, &response_len);
                 if(rv == MYNFS_CLOSED)
                 {
                     free(response);
@@ -220,12 +220,14 @@ int main(int argc, char** argv) {
                     nfs_log_info(logger, "Connection with remote client closed");
                     continue;
                 }
-                else
+                else if(response != NULL)
                 {
                     if((rv = write(sub_socket, response, response_len)) == -1)
                         nfs_log_error(logger, "Failed to write: %s", strerror(errno));
 
                     free(response);
+                } else {
+                    nfs_log_error(logger, "Failed to prepare response - response == NULL");
                 }
             }
         }
