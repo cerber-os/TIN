@@ -251,7 +251,8 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
         struct mynfs_datagram_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
         if(full_packet == NULL) {
             nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
-            *response = *response_size = 0;
+            *response = NULL;
+            *response_size = 0;
             return MYNFS_OVERLOAD;
         }
 
@@ -261,6 +262,7 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
 
         free(*response);
         *response = full_packet;
+        *response_size += sizeof(*full_packet);
     }
 
     return ret;
