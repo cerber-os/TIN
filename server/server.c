@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
         {
             temp = temp->next;
             if (FD_ISSET(temp->fd, &read_fds)) 
-            {                
+            {
                 if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
                 {
                     nfs_log_error(logger, "Failed to read: %s", strerror(errno));
@@ -206,11 +206,15 @@ int main(int argc, char** argv) {
                     nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Strange!");
                     continue;
                 }
+
+                update_timeout(sub_socket);
+
                 response = NULL;
                 response_len = 0;
                 rv = process_client_message(sub_socket, buffer, rv, (void**) response, &response_len);
                 if(rv == MYNFS_CLOSED)
                 {
+                    free(response);
                     close(sub_socket);
                     list_remove_by_fd(&sockets_list, sub_socket);
                     nfs_log_info(logger, "Connection with remote client closed");
@@ -220,8 +224,18 @@ int main(int argc, char** argv) {
                 {
                     if((rv = write(sub_socket, response, response_len)) == -1)
                         nfs_log_error(logger, "Failed to write: %s", strerror(errno));
+
+                    free(response);
                 }
             }
+        }
+
+        // Monitor for timeouts
+        int timedout_client_fd = check_timeouts();
+        if(timedout_client_fd >= 0) {
+            close(timedout_client_fd);
+            list_remove_by_fd(&sockets_list, timedout_client_fd);
+            nfs_log_info(logger, "Disconnected client - timeout");
         }
     } while(1);
 }
