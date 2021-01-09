@@ -99,8 +99,8 @@ int main(int argc, char** argv) {
 
     char* config_file = "./server/example.cfg";
     if(argc < 2) {
-        nfs_log_warn(logger, "No location of configuration file provided in argv[1]");
-        nfs_log_info(logger, "will use `./server/example.cfg` instead");
+        nfs_log_warn(logger, "No location of configuration file provided in argv[1] ...");
+        nfs_log_info(logger, "... will use `./server/example.cfg` instead");
     } else {
         config_file = argv[1];
         nfs_log_info(logger, "Reading config file from `%s`", config_file);
