@@ -25,14 +25,13 @@ char* sanitize_path(char* path) {
     combined_path[nfs_path_length] = '/';
     strncpy(&combined_path[nfs_path_length + 1], path, path_length);
 
-    char* normalized_path = realpath(combined_path, NULL);
-    if(normalized_path == NULL) {
-        nfs_log_error(logger, "User provided path cannot be normalized - %s", strerror(errno));
-        free(combined_path);
+    // Normalizing path would be better... Maybe later
+    char* normalized_path = combined_path;
+
+    if(strstr(normalized_path, "/../")) {
+        free(normalized_path);
         return NULL;
     }
-    free(combined_path);
-
     // Check whether normalized path starts with path to the shared directory
     if(strncmp(normalized_path, nfs_path, nfs_path_length - 1)) {
         free(normalized_path);
@@ -115,6 +114,7 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         }
     }
 
+    nfs_log_debug(logger, "Processing command ID(%d) from packet of data size %d", packet->cmd, packet->data_length);
     switch(packet->cmd) {
         case MYNFS_CMD_OPEN: {
             int lock_file = 0;
@@ -148,7 +148,7 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
 
             client->opened_file_fd = open(sanitized_path, open_data->oflag, open_data->mode);
             if(client->opened_file_fd < 0) {
-                nfs_log_error(logger, "Failed to open file `%s` - errno: %d", path_name, errno);
+                nfs_log_error(logger, "Failed to open file `%s` - errno: %d", sanitized_path, errno);
                 free(sanitized_path);
                 return (errno > 0) ? -1 * errno : errno;
             }
