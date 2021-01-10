@@ -4,14 +4,12 @@ using namespace std;
 uint16_t getPortFromString(string host){
     size_t pos = host.find_last_of(':');
     string port = host.substr(pos + 1, host.length() - 1);
-    cout<< port<< endl;
     return (uint16_t)stoul( port );
 }
 
 string getIpFromString (string host){
     size_t pos = host.find_last_of(':');
     string ip = host.substr(0, pos);
-    cout<< ip<< endl;
     return ip;
 }
 
@@ -32,6 +30,7 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
+    free(clientSubMsg);
 
     clientMsg->cmd= MYNFS_CMD_OPEN;
     clientMsg->handle = 0;
@@ -88,7 +87,8 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
- 
+    free(clientSubMsg);
+
     clientMsg->cmd= MYNFS_CMD_WRITE;
     clientMsg->handle = fd;
     clientMsg->data_length = sub_msg_size;
@@ -154,6 +154,7 @@ int mynfs_unlink(char *host, char *pathname)
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
+    free(clientSubMsg);
 
     clientMsg->cmd= MYNFS_CMD_UNLINK;
     clientMsg->handle = 0;
