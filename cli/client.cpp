@@ -6,39 +6,47 @@
 #include <algorithm>
 #include <sstream>
 
+#include <fcntl.h>      //tutaj sa zdefioniowane flagi otwarcia pliku
+
 using namespace std;
 
 int getPort(string host){
     std::size_t pos = host.find_last_of(':');
     string port = host.substr(pos + 1, host.length() - 1);
-    cout<< port<< std::endl;
     return std::stoi( port );
 }
 
 string getIp (string host){
     std::size_t pos = host.find_last_of(':');
     string ip = host.substr(0, pos);
-    cout<< ip<< std::endl;
     return ip;
 }
-int chooseDescriptor(std::vector<int16_t> &openedDescriptors)
+
+std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDescriptors)
 {
     std::cout << "Choose descriptor: ";
     for (auto d : openedDescriptors)
-        std::cout << d << " ";;
+        std::cout << d.first << " ";
     std::cout << std::endl;
 
     std::string fdStr;
     std::getline(std::cin, fdStr);
-    auto fd = static_cast<int16_t>(std::stoi(fdStr));
+    int fd = std::stoi(fdStr);
 
-    if (std::find(openedDescriptors.begin(), openedDescriptors.end(), fd) == openedDescriptors.end())
-        return -1;
+    std::pair<int, int> chosen_pair;
 
-    return fd;
+    for(int i=0; i < openedDescriptors.size(); i++){
+        if(openedDescriptors[i].first == fd){
+            chosen_pair = openedDescriptors[i];
+            break;
+        }
+        return std::make_pair(-1, -1);
+    }
+
+    return chosen_pair;
 }
 
-int nfsread(std::string &host, std::vector<int16_t> &openedDescriptors)
+int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
 {
     int16_t count;
     std::string scount;
@@ -53,9 +61,9 @@ int nfsread(std::string &host, std::vector<int16_t> &openedDescriptors)
     }
 
     auto fd = chooseDescriptor(openedDescriptors);
-    if (fd == -1)
+    if (fd.first == -1)
     {
-        std::cout << "Bad file descriptor " << fd << "." << std::endl;
+        std::cout << "Bad file descriptor " << fd.first << "." << std::endl;
         return -1;
     }
 
@@ -63,7 +71,7 @@ int nfsread(std::string &host, std::vector<int16_t> &openedDescriptors)
     std::getline(std::cin, scount);
     count = static_cast<int16_t>(std::stoi(scount));
 
-    int16_t size = mynfs_read((char*)getIp(host).c_str(), getPort(host),fd, pBuf, count);
+    int16_t size = mynfs_read(fd.second, fd.first, pBuf, count);
 
     std::cout << "Success" << std::endl;
     std::cout << size << " bytes read" << std::endl;
@@ -83,7 +91,7 @@ int nfsread(std::string &host, std::vector<int16_t> &openedDescriptors)
 
 
 
-int nfsopen(std::string &host, std::vector<int16_t> &openedDescriptors)
+int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
 {
     std::string path;
     uint16_t oflag = 0;
@@ -93,7 +101,7 @@ int nfsopen(std::string &host, std::vector<int16_t> &openedDescriptors)
 
     std::cout << "Path to file:" << std::endl;
     std::getline(std::cin, path);
-    std::cout << "Oflag/s:" << std::endl;
+    std::cout << "Oflag/s: work in progress - enter to skip" << std::endl;
     std::cout << "Possible values: RDONLY | WRONLY | RDWR" << std::endl;
     std::cout << "In order to use more flags write them down with whitespaces between them." << std::endl;
     std::getline(std::cin, soflag);
@@ -105,7 +113,7 @@ int nfsopen(std::string &host, std::vector<int16_t> &openedDescriptors)
         it = flags.find(word);
         if (it != flags.end())
         {
-            oflag = 'RDONLY';
+            oflag = O_RDONLY; 
         }
         else
         {
@@ -113,15 +121,17 @@ int nfsopen(std::string &host, std::vector<int16_t> &openedDescriptors)
             return -1;
         }
     }
+    // TODO: W tej chwili w wywolaniu mynfs_open flagi sa ustawione na sztywno, trzeba bedzie je obsluzyc
 
-    int fd = mynfs_open((char*)getIp(host).c_str(),getPort(host), (char*)path.c_str(), oflag, 0);  //TODO: co z mode?
+    int socketFd;
+    int fd = mynfs_open((char*)(host).c_str(), (char*)path.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, &socketFd);
     std::cout << "Success" << std::endl;
-    std::cout << "Opened file descriptor: " << fd << std::endl;
-    openedDescriptors.push_back(fd);
+    std::cout << "Opened file descriptor: " << fd << std::endl;     // TODO: obsluga bledow
+    openedDescriptors.push_back(std::make_pair(fd, socketFd));
     return fd;
 }
 
-int nfswrite(std::string &host, std::vector<int16_t> &openedDescriptors)
+int nfswrite(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
 {
     std::string buf;
 
@@ -134,9 +144,9 @@ int nfswrite(std::string &host, std::vector<int16_t> &openedDescriptors)
     }
 
     auto fd = chooseDescriptor(openedDescriptors);
-    if (fd == -1)
+    if (fd.first == -1)
     {
-        std::cout << "Bad file descriptor " << fd << "." << std::endl;
+        std::cout << "Bad file descriptor " << fd.first << "." << std::endl;
         return -1;
     }
 
@@ -147,15 +157,13 @@ int nfswrite(std::string &host, std::vector<int16_t> &openedDescriptors)
     void *pBuf = byteArray;
     count = static_cast<int16_t>(buf.length());
 
-    int16_t size = mynfs_write((char*)getIp(host).c_str(),getPort(host), fd, pBuf, count);
-    //int16_t size = mynfs_write( fd, pBuf, count);
+    int16_t size = mynfs_write(fd.second, fd.first, pBuf, count);
     std::cout << "Success" << std::endl;
     std::cout << size << " bytes written" << std::endl;
     return size;
 }
 
-int nfslseek(std::string &host, std::vector<int16_t> &openedDescriptors)
-{
+int nfslseek(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors){
     std::string soffset;
     int32_t offset;
     std::string swhence;
@@ -170,9 +178,9 @@ int nfslseek(std::string &host, std::vector<int16_t> &openedDescriptors)
     }
 
     auto fd = chooseDescriptor(openedDescriptors);
-    if (fd == -1)
+    if (fd.first == -1)
     {
-        std::cout << "Bad file descriptor " << fd << "." << std::endl;
+        std::cout << "Bad file descriptor " << fd.first << "." << std::endl;
         return -1;
     }
 
@@ -198,7 +206,7 @@ int nfslseek(std::string &host, std::vector<int16_t> &openedDescriptors)
         return -1;
     }
 
-    offset = mynfs_lseek((char*)getIp(host).c_str(),getPort(host), fd, offset, whence);
+    offset = mynfs_lseek(fd.second, fd.first, offset, whence);
 
     std::cout << "Success" << std::endl;
     std::cout << "New offset: " << offset << std::endl;
@@ -206,7 +214,7 @@ int nfslseek(std::string &host, std::vector<int16_t> &openedDescriptors)
 }
 
 
-int nfsclose(std::string &host, std::vector<int16_t> &openedDescriptors)
+int nfsclose(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
 {
     if(openedDescriptors.empty())
     {
@@ -215,13 +223,13 @@ int nfsclose(std::string &host, std::vector<int16_t> &openedDescriptors)
     }
 
     auto fd = chooseDescriptor(openedDescriptors);
-    if (fd == -1)
+    if (fd.first == -1)
     {
-        std::cout << "Bad file descriptor " << fd << "." << std::endl;
+        std::cout << "Bad file descriptor " << fd.first << "." << std::endl;
         return -1;
     }
 
-    mynfs_close((char*)getIp(host).c_str(),getPort(host), fd);
+    mynfs_close(fd.second, fd.first);
 
 
     openedDescriptors.erase(std::remove(openedDescriptors.begin(), openedDescriptors.end(), fd),
@@ -235,7 +243,7 @@ int nfsunlink(std::string &host)
     std::string path;
     std::cout << "Path to file:" << std::endl;
     std::getline(std::cin, path);
-    mynfs_unlink((char*)getIp(host).c_str(),getPort(host), (char*)path.c_str());
+    mynfs_unlink((char*)(host).c_str(), (char*)path.c_str());
     std::cout << "Success" << std::endl;
     return 0;
 }
@@ -261,7 +269,7 @@ void changeHost(std::string &host, std::vector<string> &hosts){
 
 void addHost(vector<std::string> &hosts){
 if(hosts.size() > 2){
-    std:cout<< "Cannot add more hosts,"<< std::endl;
+    std::cout<< "Cannot add more hosts,"<< std::endl;
     return;
 }
 else {
@@ -275,7 +283,7 @@ else {
 }
 void removeHost(vector<std::string> &hosts){
     if(hosts.size() <= 0){
-        std:cout<< "Cannot delete more hosts,"<< std::endl;
+        std::cout<< "Cannot delete more hosts,"<< std::endl;
         return;
     }
     else {
@@ -304,7 +312,7 @@ int main(int argc, char *argv[])
     std::map<int, std::string> filesIdentificators;
     std::vector<std::string> hosts;
     std::map<std::string, std::vector<int>> hostsWithDescriptors;
-    std::vector<int16_t> openedDescriptors;
+    std::vector<std::pair<int, int>> openedDescriptors;     //para na deskryptor pliku + deskryptor socketa
     bool exit = false;
     std::cout << "Welcome to MyNFS!\n";
     std::cout << "Server address (IP:PORT):" << std::endl;
@@ -317,7 +325,7 @@ int main(int argc, char *argv[])
         std::cout << "Available commands to run:" <<std::endl;
         std::cout<< "open, read, write, lseek, close, unlink, exit, hostchange" << std::endl;
         std::getline(std::cin, choice);
-        if (choice == "open") nfsopen(currentHost,openedDescriptors);
+        if (choice == "open") nfsopen(currentHost, openedDescriptors);
 
         else if (choice == "read") nfsread(currentHost, openedDescriptors);
 

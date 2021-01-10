@@ -25,15 +25,19 @@ struct nfs_logger* logger;
 /*
  * Config file format specifiers
  */
-int port_number, colored_logs, client_queue;
-char* hostname, * nfs_path;
+int port_number, colored_logs, client_queue, log_level, select_timeout, rw_timeout;
+char* hostname, * nfs_path, * log_file_location;
 
 struct config_field fields[] = {
-    {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
     {.name = "HOSTNAME", .type = CONFIG_TYPE_STRING, .dst = &hostname, .mandatory = 1},
-    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
-    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs, .mandatory = 1},
+    {.name = "PORT", .type = CONFIG_TYPE_INT, .dst = &port_number, .mandatory = 1},
     {.name = "CLIENT_QUEUE", .type = CONFIG_TYPE_INT, .dst = &client_queue, .mandatory = 1},
+    {.name = "TIMEOUT_SELECT", .type = CONFIG_TYPE_INT, .dst = &select_timeout, .mandatory = 1},
+    {.name = "TIMEOUT_RW", .type = CONFIG_TYPE_INT, .dst = &rw_timeout, .mandatory = 1},
+    {.name = "NFS_PATH", .type = CONFIG_TYPE_STRING, .dst = &nfs_path, .mandatory = 1},
+    {.name = "LOG_FILE", .type = CONFIG_TYPE_STRING, .dst = &log_file_location, .mandatory = 1},
+    {.name = "LOG_LEVEL", .type = CONFIG_TYPE_INT, .dst = &log_level},
+    {.name = "COLORED_LOGS", .type = CONFIG_TYPE_BOOL, .dst = &colored_logs},
 };
 
 
@@ -91,26 +95,47 @@ err:
 /*
  * Main network filesystem (NFS) server logic
  */
-int main() {
-    nfs_log_open(&logger, "/tmp/test.txt", LOG_LEVEL_INFO, 1);
-    nfs_log_info(logger, "Server version V0.1 starting");
+int main(int argc, char** argv) {
+    nfs_log_open(&logger, NULL, LOG_LEVEL_INFO, 1);
+    nfs_log_info(logger, "myNFS server (V0.1)");
 
-    parse_config(fields, 4, "server/example.cfg");
-    nfs_log_info(logger, "Selected port: %d", port_number);
+    char* config_file = "./server/example.cfg";
+    if(argc < 2) {
+        nfs_log_warn(logger, "No location of configuration file provided in argv[1] ...");
+        nfs_log_info(logger, "... will use `./server/example.cfg` instead");
+    } else {
+        config_file = argv[1];
+        nfs_log_info(logger, "Reading config file from `%s`", config_file);
+    }
+
+    int err = parse_config(fields, sizeof(fields) / sizeof(fields[0]), config_file);
+    if(err) {
+        nfs_log_error(logger, "Parsing log file failed");
+        return 1;
+    }
+
+    // Reopen logger after configuration has been read from config file
+    nfs_log_close(logger);
+    nfs_log_open(&logger, log_file_location, log_level, colored_logs);
 
     // create listening socket
     int main_sock, sub_socket, max_fd, ready_sockets, rv;
     struct sockaddr_in server;
     fd_set read_fds;
-    char **response;
-    size_t response_len;
-    struct timeval timeout;
+    char *response;
+    size_t response_len, rw_len, header_len, data_len;
+    struct timeval timeout_select, timeout_rw;
     char buffer[MAX_BUF];
+
+    timeout_select.tv_sec = select_timeout;
+    timeout_select.tv_usec = 0;
+    timeout_rw.tv_sec = rw_timeout;
+    timeout_rw.tv_usec = 0;
     
-    main_sock = socket(AF_INET, SOCK_STREAM, 0);
+    main_sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (main_sock == -1) 
     {
-        nfs_log_info(logger, "Failed to open stream socket: %s", strerror(errno));
+        nfs_log_error(logger, "Failed to open stream socket: %s", strerror(errno));
         exit(1);
     }
     else
@@ -122,31 +147,37 @@ int main() {
     server.sin_port = htons(port_number);
     if (bind(main_sock, (struct sockaddr *) &server, sizeof server) == -1) 
     {
-        nfs_log_info(logger, "Failed to bind stream socket: %s", strerror(errno));
+        nfs_log_error(logger, "Failed to bind stream socket: %s", strerror(errno));
         exit(1);
     }
+
+    nfs_log_info(logger, "Listening on port %d...", port_number);
 
     list_node *temp, *sockets_list = list_create(main_sock);
 
     listen(main_sock, client_queue);
     do {
+        timeout_select.tv_sec = select_timeout;
+        timeout_select.tv_usec = 0;
+        timeout_rw.tv_sec = rw_timeout;
+        timeout_rw.tv_usec = 0;
+        
         FD_ZERO(&read_fds);
+        FD_SET(sockets_list->fd, &read_fds);
         temp = sockets_list;
         while(temp->next)
         {
-            FD_SET(temp->fd, &read_fds);
             temp = temp->next;
+            FD_SET(temp->fd, &read_fds);
         }
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
-        if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout)) == -1) 
+        if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout_select)) == -1) 
         {
-             nfs_log_info(logger, "Failed to select: %s", strerror(errno));
-             continue;
+            nfs_log_error(logger, "Failed to select: %s", strerror(errno));
+            continue;
         }
         if (ready_sockets == 0)
         {
-            nfs_log_info(logger, "We didn't receive any data. Restarting select...");
+            nfs_log_debug(logger, "We didn't receive any data. Restarting select...");
             continue;
         }
         if (FD_ISSET(main_sock, &read_fds)) 
@@ -156,50 +187,128 @@ int main() {
                 max_fd = max(max_fd, sub_socket + 1);
                 if(add_new_client(sub_socket) ==  MYNFS_OVERLOAD)
                 {
-                    nfs_log_info(logger, "Too many clients connected. Refused new connection.");
+                    nfs_log_warn(logger, "Too many clients connected. Refused new connection.");
                     close(sub_socket);
                     break;
                 }
                 else
                 {
+                    if(setsockopt(sub_socket, SOL_SOCKET, SO_RCVTIMEO | SO_SNDTIMEO, (const char*)&timeout_rw, sizeof(timeout_rw)))
+                    {
+                        nfs_log_error(logger, "Failed to set socket options: %s", strerror(errno));
+                        close(sub_socket);
+                        continue;
+                    }
                     list_add(sockets_list, sub_socket);
                     nfs_log_info(logger, "New connection accepted");
                 }
             }
             if (sub_socket == -1)
-                nfs_log_info(logger, "Failed to accept: %s", strerror(errno));  
+                nfs_log_warn(logger, "Failed to accept: %s", strerror(errno));
         }
-        temp = sockets_list->next;
+        temp = sockets_list;
         while(temp->next)
         {
+            temp = temp->next;
             if (FD_ISSET(temp->fd, &read_fds)) 
-            {                
-                if((rv = read(sub_socket, buffer, MAX_BUF)) == -1)
+            {
+                bzero(buffer, sizeof(buffer));
+                rw_len = 0;
+                header_len = sizeof(struct mynfs_datagram_t);
+                while(rw_len < header_len)
                 {
-                    nfs_log_info(logger, "Failed to read: %s", strerror(errno));
-                    continue;
-                }   
-                if (rv == 0) 
-                {
-                    nfs_log_info(logger, "Socket was ready to read, but we didn't get any data. Strange!");
-                    continue;
+                    rv = read(temp->fd, buffer + rw_len, header_len - rw_len);
+                    if(rv == -1)
+                    {
+                        nfs_log_error(logger, "Failed to read: %s", strerror(errno));
+                        nfs_log_debug(logger, "We tried to read %zu bytes", header_len - rw_len);
+                        continue;
+                    }
+                    else if(rv == 0)
+                    {
+                        nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Client probably disconnected");
+                        break;
+                    }
+                    else
+                    {
+                        rw_len += rv; 
+                        nfs_log_debug(logger, "Read %d bytes. Still waiting for %zu bytes", rw_len, header_len - rw_len);
+                    }
+                                   
                 }
+
+                rw_len = 0;
+                data_len = ((struct mynfs_datagram_t*) buffer)->data_length;
+                while(rw_len < data_len)
+                {
+                    rv = read(temp->fd, buffer + rw_len + header_len, data_len - rw_len);
+                    if(rv == -1)
+                    {
+                        nfs_log_error(logger, "Failed to read: %s", strerror(errno));
+                        nfs_log_debug(logger, "We tried to read %zu bytes", data_len - rw_len);
+                        continue;
+                    }
+                    else if(rv == 0)
+                    {
+                        nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Client probably disconnected");
+                        break;
+                    }
+                    else
+                    {
+                        rw_len += rv; 
+                        nfs_log_debug(logger, "Read %d bytes. Still waiting for %zu bytes", rw_len, data_len - rw_len);
+                    }              
+                }
+
+                update_timeout(temp->fd);
+
                 response = NULL;
                 response_len = 0;
-                rv = process_client_message(sub_socket, buffer, rv, (void**) response, &response_len);
+                rv = process_client_message(temp->fd, buffer, header_len + data_len, (void**) &response, &response_len);
                 if(rv == MYNFS_CLOSED)
                 {
-                    close(sub_socket);
-                    list_remove_by_fd(&sockets_list, sub_socket);
+                    free(response);
+                    close(temp->fd);
+                    list_remove_by_fd(&sockets_list, temp->fd);
+                    nfs_log_info(logger, "Connection with remote client closed");
                     continue;
                 }
-                else
+                else if(response != NULL)
                 {
-                    if((rv = write(sub_socket, response, response_len)) == -1)
-                        nfs_log_info(logger, "Failed to write: %s", strerror(errno));
-                }
+                    rw_len = 0;
+                    while(rw_len < response_len)
+                    {
+                        rv = write(temp->fd, response + rw_len, response_len - rw_len);
+                        if(rv == -1)
+                        {
+                            nfs_log_error(logger, "Failed to write: %s", strerror(errno));
+                            nfs_log_debug(logger, "We tried to send %zu bytes", response_len - rw_len);
+                            continue;
+                        }
+                        else if(rv == 0)
+                        {
+                            nfs_log_warn(logger, "We tried to send some data, but we failed. Strange!");
+                            continue;
+                        }
+                        else
+                        {
+                            rw_len += rv; 
+                            nfs_log_debug(logger, "Send %d bytes. Still waiting to send %zu bytes", rv, response_len - rw_len);
+                        }              
+                    }
+                    free(response);
+                } 
+                else
+                    nfs_log_error(logger, "Failed to prepare response - response == NULL");
             }
-            temp = temp->next;
+        }
+
+        // Monitor for timeouts
+        int timedout_client_fd = check_timeouts();
+        if(timedout_client_fd >= 0) {
+            close(timedout_client_fd);
+            list_remove_by_fd(&sockets_list, timedout_client_fd);
+            nfs_log_info(logger, "Disconnected client - timeout");
         }
     } while(1);
 }

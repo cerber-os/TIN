@@ -28,11 +28,13 @@ struct nfs_logger {
 
 const char* logs_prefixes[2][LOG_LEVEL_MAX] = {
     [1] = {
+        [LOG_LEVEL_DEBUG] = LOGGER_RESET "DEBUG" LOGGER_RESET,
         [LOG_LEVEL_INFO] = LOGGER_GREEN "INFO" LOGGER_RESET,
         [LOG_LEVEL_WARN] = LOGGER_YELLOW "WARN" LOGGER_RESET,
         [LOG_LEVEL_ERROR] = LOGGER_RED "ERR" LOGGER_RESET,
     },
     [0] = {
+        [LOG_LEVEL_DEBUG] = "DEBUG",
         [LOG_LEVEL_INFO] = "INFO",
         [LOG_LEVEL_WARN] = "WARN",
         [LOG_LEVEL_ERROR] = "ERR",
@@ -91,45 +93,69 @@ int nfs_log_open(struct nfs_logger** p_logger, const char* path, enum log_level 
     return 0;
 }
 
+
+void nfs_log_debug(struct nfs_logger* logger, const char* fmt, ...) {
+    if(logger->log_level > LOG_LEVEL_DEBUG)
+        return;
+
+    va_list vargs1;
+    va_start(vargs1, fmt);
+    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_DEBUG, fmt, vargs1);
+    va_end(vargs1);
+
+    va_list vargs2;
+    va_start(vargs2, fmt);
+    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_DEBUG, fmt, vargs2);
+    va_end(vargs2);
+}
+
+
 void nfs_log_info(struct nfs_logger* logger, const char* fmt, ...) {
-    va_list vargs;
-    va_start(vargs, fmt);
-    
     if(logger->log_level > LOG_LEVEL_INFO)
         return;
 
-    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_INFO, fmt, vargs);
-    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_INFO, fmt, vargs);
+    va_list vargs1;
+    va_start(vargs1, fmt);
+    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_INFO, fmt, vargs1);
+    va_end(vargs1);
 
-    va_end(vargs);
+    va_list vargs2;
+    va_start(vargs2, fmt);
+    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_INFO, fmt, vargs2);
+    va_end(vargs2);
 }
 
 
 void nfs_log_warn(struct nfs_logger* logger, const char* fmt, ...) {
-    va_list vargs;
-    va_start(vargs, fmt);
-    
     if(logger->log_level > LOG_LEVEL_WARN)
         return;
+    
+    va_list vargs1;
+    va_start(vargs1, fmt);
+    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_WARN, fmt, vargs1);
+    va_end(vargs1);
 
-    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_WARN, fmt, vargs);
-    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_WARN, fmt, vargs);
+    va_list vargs2;
+    va_start(vargs2, fmt);
+    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_WARN, fmt, vargs2);
+    va_end(vargs2);
 
-    va_end(vargs);
 }
 
 
 void nfs_log_error(struct nfs_logger* logger, const char* fmt, ...) {
-    va_list vargs;
-    va_start(vargs, fmt);
-    
     if(logger->log_level > LOG_LEVEL_ERROR)
         return;
+    
+    va_list vargs1;
+    va_start(vargs1, fmt);
+    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_ERROR, fmt, vargs1);
+    va_end(vargs1);
 
-    nfs_write_file(logger->stdout_fd, logger->color_mode, LOG_LEVEL_ERROR, fmt, vargs);
-    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_ERROR, fmt, vargs);
-
-    va_end(vargs);
+    va_list vargs2;
+    va_start(vargs2, fmt);
+    nfs_write_file(logger->file_fd, 0, LOG_LEVEL_ERROR, fmt, vargs2);
+    va_end(vargs2);
 }
 
 void nfs_log_close(struct nfs_logger* logger) {

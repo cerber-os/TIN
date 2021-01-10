@@ -8,6 +8,9 @@
 #include <stdint.h>
 #include <unistd.h>
 
+// Special flag to function mynfs_open, used to lock access to file
+#define O_MYNFS_LOCK        0x8000
+
 enum mynfs_error_code {
     // Critical bugs
     MYNFS_INVALID_CLIENT   = -1000,
@@ -17,9 +20,11 @@ enum mynfs_error_code {
     MYNFS_UNKNOWN_COMMAND,
     MYNFS_ALREADY_OPENED,
     MYNFS_OVERLOAD,
+    MYNFS_INVALID_PATH,
+    MYNFS_ALREADY_LOCKED,
 
     // Others
-    MYNFS_CLOSED            = 100,
+    MYNFS_CLOSED            = -100,
 
     // Success
     MYNFS_SUCCESS           = 0,

@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdlib.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -11,7 +13,33 @@
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 extern struct nfs_logger* logger;
+extern char* nfs_path;
 struct client clients[MAX_CLIENTS_COUNT];
+
+char* sanitize_path(char* path) {
+    size_t path_length = strlen(path);
+    size_t nfs_path_length = strlen(nfs_path);
+
+    char* combined_path = calloc(1, path_length + nfs_path_length + 2);
+    strcpy(combined_path, nfs_path);
+    combined_path[nfs_path_length] = '/';
+    strncpy(&combined_path[nfs_path_length + 1], path, path_length);
+
+    // Normalizing path would be better... Maybe later
+    char* normalized_path = combined_path;
+
+    if(strstr(normalized_path, "/../")) {
+        free(normalized_path);
+        return NULL;
+    }
+    // Check whether normalized path starts with path to the shared directory
+    if(strncmp(normalized_path, nfs_path, nfs_path_length - 1)) {
+        free(normalized_path);
+        return NULL;
+    }
+
+    return normalized_path;
+}
 
 static struct client* get_client_by_socket(int socket_fd) {
     for(int i = 0; i < ARRAY_SIZE(clients); i++)
@@ -86,8 +114,10 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         }
     }
 
+    nfs_log_debug(logger, "Processing command ID(%d) from packet of data size %d", packet->cmd, packet->data_length);
     switch(packet->cmd) {
         case MYNFS_CMD_OPEN: {
+            int lock_file = 0;
             struct mynfs_open_t* open_data = (struct mynfs_open_t*) packet->data;
             if(packet->data_length < sizeof(*open_data) 
                     || packet->data_length < sizeof(*open_data) + open_data->path_length) {
@@ -100,18 +130,42 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             }
 
             char* path_name = strndup((char*)open_data->name, open_data->path_length);
-            // TODO: Sanitize path_name
+            char* sanitized_path = sanitize_path(path_name);
 
-            client->opened_file_fd = open(path_name, open_data->oflag, open_data->mode);
-            if(client->opened_file_fd < 0) {
-                nfs_log_error(logger, "Failed to open file `%s` - errno: %d", path_name, errno);
+            if(sanitized_path == NULL) {
+                nfs_log_error(logger, "User provided path is invalid - %s", path_name);
                 free(path_name);
-                return (errno > 0) ? -1 * errno : errno;
+                return MYNFS_INVALID_PATH;
+            }
+            free(path_name);
+
+            // Handle lock flag
+            if(open_data->oflag & O_MYNFS_LOCK) {
+                nfs_log_debug(logger, "File lock has been requested by the client");
+                lock_file = 1;
+                open_data->oflag &= ~O_MYNFS_LOCK;
             }
 
-            // TODO: chown
+            client->opened_file_fd = open(sanitized_path, open_data->oflag, open_data->mode);
+            if(client->opened_file_fd < 0) {
+                nfs_log_error(logger, "Failed to open file `%s` - errno: %d", sanitized_path, errno);
+                free(sanitized_path);
+                return (errno > 0) ? -1 * errno : errno;
+            }
+            free(sanitized_path);
 
-            free(path_name);
+            if(lock_file) {
+                int ret = flock(client->opened_file_fd, LOCK_EX | LOCK_NB);
+                if(ret < 0) {
+                    if(errno == EWOULDBLOCK) {
+                        nfs_log_debug(logger, "Failed to lock file - file is already locked");
+                        return MYNFS_ALREADY_LOCKED;
+                    } else {
+                        nfs_log_error(logger, "Failed to lock file - flock returned %s", strerror(errno));
+                        return (errno > 0) ? -1 * errno : errno;
+                    }
+                }
+            }
         }
         break;
     
@@ -212,10 +266,16 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             }
 
             char* path_name = strndup((char*)unlink_data->name, unlink_data->path_length);
-            // TODO: Sanitize path_name
+            char* sanitized_path = sanitize_path(path_name);
+            if(sanitized_path == NULL) {
+                nfs_log_error(logger, "User provided path is invalid - %s", path_name);
+                free(path_name);
+                return MYNFS_INVALID_PATH;
+            }
+            free(path_name);
+
 
             int ret = unlink(path_name);
-
             if(ret < 0) {
                 nfs_log_error(logger, "Failed to unlink file `%s` - errno: %d", path_name, errno);
                 free(path_name);
@@ -251,7 +311,8 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
         struct mynfs_datagram_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
         if(full_packet == NULL) {
             nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
-            *response = *response_size = 0;
+            *response = NULL;
+            *response_size = 0;
             return MYNFS_OVERLOAD;
         }
 
@@ -261,6 +322,7 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
 
         free(*response);
         *response = full_packet;
+        *response_size += sizeof(*full_packet);
     }
 
     return ret;

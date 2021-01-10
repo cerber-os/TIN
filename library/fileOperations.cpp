@@ -1,18 +1,16 @@
 #include "fileOperations.h"
 using namespace std;
 
-int getPortFromString(string host){
+uint16_t getPortFromString(string host){
     size_t pos = host.find_last_of(':');
     string port = host.substr(pos + 1, host.length() - 1);
-    cout<< port<< endl;
-    return stoi( port );
+    return (uint16_t)stoul( port );
 }
 
-char* getIpFromString (string host){
+string getIpFromString (string host){
     size_t pos = host.find_last_of(':');
     string ip = host.substr(0, pos);
-    cout<< ip<< endl;
-    return (char*)ip.c_str();
+    return ip;
 }
 
 int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
@@ -32,6 +30,7 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
+    free(clientSubMsg);
 
     clientMsg->cmd= MYNFS_CMD_OPEN;
     clientMsg->handle = 0;
@@ -39,7 +38,7 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
 
     mynfs_datagram_t *serverMsg;
 
-    *socketFd = createSocket(getIpFromString(string(host)), getPortFromString(string(host)));
+    *socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
     sendAndGetResponse(*socketFd, clientMsg, &serverMsg);
 
     return serverMsg->return_value;
@@ -88,7 +87,8 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
- 
+    free(clientSubMsg);
+
     clientMsg->cmd= MYNFS_CMD_WRITE;
     clientMsg->handle = fd;
     clientMsg->data_length = sub_msg_size;
@@ -117,7 +117,6 @@ off_t mynfs_lseek(int socketFd, int fd, off_t offset, int whence){
     mynfs_datagram_t *serverMsg;
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
 
-    // return value powinno byc offsetem
     return serverMsg->return_value;
 }
 
@@ -155,13 +154,14 @@ int mynfs_unlink(char *host, char *pathname)
     mynfs_datagram_t *clientMsg;
     clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
+    free(clientSubMsg);
 
     clientMsg->cmd= MYNFS_CMD_UNLINK;
     clientMsg->handle = 0;
     clientMsg->data_length = sub_msg_size;
 
     mynfs_datagram_t *serverMsg;
-    int socketFd = createSocket(getIpFromString(string(host)), getPortFromString(string(host)));
+    int socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
     closeSocket(socketFd);
 
