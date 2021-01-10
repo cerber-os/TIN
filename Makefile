@@ -1,6 +1,6 @@
 C=clang
 Cpp=clang++
-CFLAGS=-I include/ -Wall -g -pedantic -Wno-zero-length-array -fsanitize=address -fno-omit-frame-pointer
+CFLAGS=-I include/ -Wall -g -pedantic -Wno-zero-length-array -fsanitize=address -fsanitize=leak -fno-omit-frame-pointer
 
 all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/libTestServer
 

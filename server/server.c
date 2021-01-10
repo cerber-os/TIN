@@ -10,6 +10,7 @@
 #include <sys/select.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 #include "logger.h"
 #include "config_parser.h"
@@ -119,7 +120,7 @@ int main(int argc, char** argv) {
     nfs_log_open(&logger, log_file_location, log_level, colored_logs);
 
     // create listening socket
-    int main_sock, sub_socket, max_fd, ready_sockets, rv;
+    int main_sock, sub_socket, max_fd, ready_sockets, rv, sock_opt = 1;
     struct sockaddr_in server;
     fd_set read_fds;
     char *response;
@@ -141,6 +142,12 @@ int main(int argc, char** argv) {
     else
 	    max_fd = main_sock + 1;
     
+    if(setsockopt(main_sock, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(sock_opt)))
+    {
+        nfs_log_error(logger, "Failed to set socket options: %s", strerror(errno));
+        exit(1);
+    }
+    
     bzero(&server, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(hostname);
@@ -155,6 +162,8 @@ int main(int argc, char** argv) {
 
     list_node *temp, *sockets_list = list_create(main_sock);
 
+    signal(SIGPIPE, SIG_IGN);
+
     listen(main_sock, client_queue);
     do {
         timeout_select.tv_sec = select_timeout;
@@ -163,12 +172,11 @@ int main(int argc, char** argv) {
         timeout_rw.tv_usec = 0;
         
         FD_ZERO(&read_fds);
-        FD_SET(sockets_list->fd, &read_fds);
         temp = sockets_list;
-        while(temp->next)
+        while(temp)
         {
-            temp = temp->next;
             FD_SET(temp->fd, &read_fds);
+            temp = temp->next;
         }
         if((ready_sockets = select(max_fd, &read_fds, NULL, NULL, &timeout_select)) == -1) 
         {
@@ -193,7 +201,8 @@ int main(int argc, char** argv) {
                 }
                 else
                 {
-                    if(setsockopt(sub_socket, SOL_SOCKET, SO_RCVTIMEO | SO_SNDTIMEO, (const char*)&timeout_rw, sizeof(timeout_rw)))
+                    if(setsockopt(sub_socket, SOL_SOCKET, SO_RCVTIMEO | SO_SNDTIMEO, (const char*)&timeout_rw, sizeof(timeout_rw))
+                    || setsockopt(sub_socket, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(sock_opt)))
                     {
                         nfs_log_error(logger, "Failed to set socket options: %s", strerror(errno));
                         close(sub_socket);
@@ -203,13 +212,14 @@ int main(int argc, char** argv) {
                     nfs_log_info(logger, "New connection accepted");
                 }
             }
-            if (sub_socket == -1)
+            if (sub_socket == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+                nfs_log_debug(logger, "We accepted all new clients");
+            else if(sub_socket == -1 && !(errno == EAGAIN || errno == EWOULDBLOCK))
                 nfs_log_warn(logger, "Failed to accept: %s", strerror(errno));
         }
-        temp = sockets_list;
-        while(temp->next)
+        temp = sockets_list->next;
+        while(temp)
         {
-            temp = temp->next;
             if (FD_ISSET(temp->fd, &read_fds)) 
             {
                 bzero(buffer, sizeof(buffer));
@@ -226,15 +236,17 @@ int main(int argc, char** argv) {
                     }
                     else if(rv == 0)
                     {
-                        nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Client probably disconnected");
-                        break;
+                        nfs_log_warn(logger, "Read didn't get any data. Client probably disconnected");
+                        close_client(get_client_by_socket(temp->fd));
+                        close(temp->fd);
+                        temp = list_remove_by_fd(&sockets_list, temp->fd);
+                        goto disconnected_client;
                     }
                     else
                     {
                         rw_len += rv; 
                         nfs_log_debug(logger, "Read %d bytes. Still waiting for %zu bytes", rw_len, header_len - rw_len);
-                    }
-                                   
+                    }     
                 }
 
                 rw_len = 0;
@@ -250,8 +262,11 @@ int main(int argc, char** argv) {
                     }
                     else if(rv == 0)
                     {
-                        nfs_log_warn(logger, "Socket was ready to read, but we didn't get any data. Client probably disconnected");
-                        break;
+                        nfs_log_warn(logger, "Read didn't get any data. Client probably disconnected");
+                        close_client(get_client_by_socket(temp->fd));
+                        close(temp->fd);
+                        temp = list_remove_by_fd(&sockets_list, temp->fd);
+                        goto disconnected_client;
                     }
                     else
                     {
@@ -269,9 +284,8 @@ int main(int argc, char** argv) {
                 {
                     free(response);
                     close(temp->fd);
-                    list_remove_by_fd(&sockets_list, temp->fd);
+                    temp = list_remove_by_fd(&sockets_list, temp->fd);
                     nfs_log_info(logger, "Connection with remote client closed");
-                    continue;
                 }
                 else if(response != NULL)
                 {
@@ -282,6 +296,14 @@ int main(int argc, char** argv) {
                         if(rv == -1)
                         {
                             nfs_log_error(logger, "Failed to write: %s", strerror(errno));
+                            if(errno == EPIPE)
+                            {
+                                nfs_log_warn(logger, "Broken pipe. Client probably disconnected");
+                                close_client(get_client_by_socket(temp->fd));
+                                close(temp->fd);
+                                temp = list_remove_by_fd(&sockets_list, temp->fd);
+                                break;
+                            }
                             nfs_log_debug(logger, "We tried to send %zu bytes", response_len - rw_len);
                             continue;
                         }
@@ -297,10 +319,11 @@ int main(int argc, char** argv) {
                         }              
                     }
                     free(response);
-                } 
+                }
                 else
                     nfs_log_error(logger, "Failed to prepare response - response == NULL");
             }
+            disconnected_client: temp = temp->next;
         }
 
         // Monitor for timeouts

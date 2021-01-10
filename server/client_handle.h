@@ -51,6 +51,19 @@ void update_timeout(int socket_fd);
 int add_new_client(int socket_fd);
 
 /*
+ * close_client - remove a client
+ *  client - entry of client
+ */
+void close_client(struct client* client);
+
+/*
+ * get_client_by_socket - get struct client entry
+ *  socket_fd - file descriptor of client
+ * @returns: struct client entry on success or NULL if no client was found
+ */
+struct client* get_client_by_socket(int socket_fd);
+
+/*
  * check_timeouts - iterate over every active client and close connection of the first one
  *      that has its timeout expired
  * @returns: socket FD to be closed
