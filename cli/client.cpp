@@ -16,11 +16,21 @@ int getPort(string host){
     return std::stoi( port );
 }
 
+
 string getIp (string host){
     std::size_t pos = host.find_last_of(':');
     string ip = host.substr(0, pos);
     return ip;
 }
+
+
+std::pair<int, int> findDescriptorsPair(int fd, std::vector<std::pair<int, int>> &openedDescriptors){
+    for(auto desc : openedDescriptors){
+        if(desc.first == fd) return desc;
+    }
+    return std::make_pair(-1, -1);
+}
+
 
 std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDescriptors)
 {
@@ -31,20 +41,11 @@ std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDes
 
     std::string fdStr;
     std::getline(std::cin, fdStr);
-    int fd = std::stoi(fdStr);
+    int fd = std::stoi(fdStr);      // TODO: obsluga blednych inputow
 
-    std::pair<int, int> chosen_pair;
-
-    for(int i=0; i < openedDescriptors.size(); i++){
-        if(openedDescriptors[i].first == fd){
-            chosen_pair = openedDescriptors[i];
-            break;
-        }
-        return std::make_pair(-1, -1);
-    }
-
-    return chosen_pair;
+    return findDescriptorsPair(fd, openedDescriptors);
 }
+
 
 int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
 {

@@ -63,8 +63,7 @@ int mynfs_read(int socketFd, int fd, void *buf, size_t count)
     mynfs_datagram_t *serverMsg;
     sendAndGetResponse(socketFd, clientMsg, &serverMsg);
 
-    int len = ntohl(serverMsg->data_length);
-    memcpy(buf, serverMsg->data, len);
+    memcpy(buf, serverMsg->data, serverMsg->data_length);
     //return len;
     return serverMsg->return_value;
 }
