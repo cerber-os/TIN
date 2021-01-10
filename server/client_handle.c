@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -157,6 +158,8 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             if(lock_file) {
                 int ret = flock(client->opened_file_fd, LOCK_EX | LOCK_NB);
                 if(ret < 0) {
+                    close(client->opened_file_fd);
+                    client->opened_file_fd = -1;
                     if(errno == EWOULDBLOCK) {
                         nfs_log_debug(logger, "Failed to lock file - file is already locked");
                         return MYNFS_ALREADY_LOCKED;
@@ -166,6 +169,7 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
                     }
                 }
             }
+            return client->opened_file_fd;
         }
         break;
     
@@ -275,14 +279,14 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             free(path_name);
 
 
-            int ret = unlink(path_name);
+            int ret = unlink(sanitized_path);
             if(ret < 0) {
-                nfs_log_error(logger, "Failed to unlink file `%s` - errno: %d", path_name, errno);
-                free(path_name);
+                nfs_log_error(logger, "Failed to unlink file `%s` - errno: %d", sanitized_path, errno);
+                free(sanitized_path);
                 return (errno > 0) ? -1 * errno : errno;
             }
 
-            free(path_name);
+            free(sanitized_path);
             return MYNFS_SUCCESS;
         }
         break;
@@ -299,7 +303,8 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
         break;
     }
     
-    return MYNFS_SUCCESS;
+    // Each case should return sth
+    assert(0);
 }
 
 int process_client_message(int socket_fd, void* packet, size_t packet_size, void** response, size_t* response_size) {
