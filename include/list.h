@@ -11,7 +11,7 @@ typedef struct list_node {
 list_node* list_create(int fd);
 void list_destroy(list_node **list);
 list_node* list_add(list_node *list, int fd);
-void list_remove_by_fd(list_node **list, int fd);
+list_node* list_remove_by_fd(list_node **list, int fd);
 list_node* list_find_by_fd(list_node *list, int fd);
 
 #endif

@@ -38,11 +38,11 @@ list_node* list_add(list_node *list, int fd)
 }
 
 
-void list_remove_by_fd(list_node **list, int fd)
+list_node* list_remove_by_fd(list_node **list, int fd)
 {
 	list_node *before = NULL, *current = NULL;
     if (list == NULL || *list == NULL) 
-        return;
+        return NULL;
 
     // we will never remove "head" node, so this if is not needed, but I will leave it to be prepared for every case ;)
     if((*list)->fd == fd)
@@ -50,17 +50,16 @@ void list_remove_by_fd(list_node **list, int fd)
         current = *list;
         (*list) = (*list)->next;
         free(current);
+        return *list;
     }
     else
     {
         before = current = *list;
         while (current->next) 
         {
+            current = current->next;
             if (current->fd != fd)
-            {
                 before = current;
-                current = current->next;
-            }
             else
             {
                 if (current->next) 
@@ -70,13 +69,14 @@ void list_remove_by_fd(list_node **list, int fd)
                 }
                 else
                 {
-                    free(current);
                     before->next = NULL;
+                    free(current);
                 }
-                break;
+                return before;
             }
-        }        
-    }    
+        }
+    }
+    return NULL;    
 }
 
 

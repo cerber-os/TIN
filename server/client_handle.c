@@ -42,7 +42,7 @@ char* sanitize_path(char* path) {
     return normalized_path;
 }
 
-static struct client* get_client_by_socket(int socket_fd) {
+struct client* get_client_by_socket(int socket_fd) {
     for(int i = 0; i < ARRAY_SIZE(clients); i++)
         if(clients[i].active && clients[i].socket_fd == socket_fd)
             return &clients[i];
@@ -65,7 +65,9 @@ int add_new_client(int socket_fd) {
     return MYNFS_OVERLOAD;
 }
 
-static void close_client(struct client* client) {
+void close_client(struct client* client) {
+    if(!client)
+        return;
     close(client->opened_file_fd);
     client->opened_file_fd = -1;
     client->active = 0;
