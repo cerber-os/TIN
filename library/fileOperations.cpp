@@ -39,7 +39,12 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
     mynfs_datagram_t *serverMsg;
 
     *socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
+    if(*socketFd == -1){
+        free(clientMsg);
+        return -1;
+    }
     if(sendAndGetResponse(*socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
         return -1;
     }
 
@@ -66,6 +71,7 @@ int mynfs_read(int socketFd, int fd, void *buf, size_t count)
     mynfs_datagram_t *serverMsg;
 
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
         return -1;
     }
 
@@ -100,6 +106,7 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
     clientMsg->data_length = sub_msg_size;
     mynfs_datagram_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
         return -1;
     }
  
@@ -125,6 +132,7 @@ off_t mynfs_lseek(int socketFd, int fd, off_t offset, int whence){
 
     mynfs_datagram_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
         return -1;
     }
 
@@ -146,6 +154,7 @@ int mynfs_close(int socketFd, int fd)
 
     mynfs_datagram_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
         return -1;
     }
 
@@ -177,10 +186,18 @@ int mynfs_unlink(char *host, char *pathname)
 
     mynfs_datagram_t *serverMsg;
     int socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
-    if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+    if(socketFd == -1){
+        free(clientMsg);
         return -1;
     }
-    closeSocket(socketFd);
+    if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
+        return -1;
+    }
+    if(closeSocket(socketFd) == -1){
+        free(clientMsg);
+        return -1;
+    }
 
     free(clientMsg);
     return serverMsg->return_value;
@@ -201,6 +218,7 @@ int mynfs_fstat(int socketFd, int fd, struct stat *buf)
 
     mynfs_datagram_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
+        free(clientMsg);
         return -1;
     }
 

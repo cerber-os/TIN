@@ -32,12 +32,19 @@ int createSocket(char *serverIp, uint16_t port) {
 int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse){
     int rv;
 
-    //Wysylanie requesta do serwera
-    if(write(socketFd, clientRequest, sizeof(mynfs_datagram_t) + clientRequest->data_length) == -1){
-        std::cerr << "Failed to send request to server" << std::endl;
-        return -1;
+    int request_size = sizeof(mynfs_datagram_t) + clientRequest->data_length;
+    int sended_size = 0;
+    while(sended_size < request_size)
+    {
+        rv = write(socketFd, clientRequest + sended_size, request_size - sended_size);
+        if(rv == -1 || rv == 0)
+        {
+            std::cerr << "Failed to send "<<request_size - sended_size<<" bytes. Try again later" << std::endl;
+            return -1;
+        }
+        sended_size += rv; 
+        std::cout<<"* Sent "<<sended_size<<"/"<<request_size<<" bytes of request"<<std::endl;         
     }
-    std::cout<<"Request sent"<<std::endl;
 
     //Odbieranie response z serwera
     char response[MAX_BUF];
@@ -57,8 +64,8 @@ int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_data
             std::cerr << "Read didn't get any data. Server probably disconnected" << std::endl;
             return -1;
         }
-        recieved_header += rv;
-        std::cout<<"* Get "<<recieved_header<<" bytes of header data"<<std::endl;
+        recieved_header += rv; 
+        std::cout<<"* Got "<<recieved_header<<"/"<<header_size<<" bytes of response header"<<std::endl;
     }
 
     (*serverResponse) = (mynfs_datagram_t *) response;
@@ -77,10 +84,10 @@ int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_data
             return -1;
         }
         recieved_submsg += rv;
-        std::cout<<"* Get "<<recieved_submsg<<" bytes of submessage data"<<std::endl;
+        std::cout<<"* Got "<<recieved_submsg<<"/"<<submsg_size<<" bytes of response submessage"<<std::endl;
     }
 
-    std::cout << "Response is received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
+    std::cout << "Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
     std::cout << "* Return value: " << (*serverResponse)->return_value << std::endl;
     std::cout << "* Command number: " << (*serverResponse)->cmd << std::endl;
     std::cout << "* Data length: " << submsg_size << std::endl;
@@ -89,5 +96,9 @@ int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_data
 }
 
 int closeSocket(int socketFd){
-    return close(socketFd);
+    int rv = close(socketFd);
+    if(rv == -1){
+        std::cerr << "Error during closing socket" << std::endl;
+    }
+    return rv;
 }
