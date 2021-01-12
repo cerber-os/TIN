@@ -8,7 +8,10 @@
 #include <unistd.h>
 #include <iostream>
 
+
 #include "../include/packets.h"
+
+#define MAX_BUF 8192
 
 int createSocket(char *serverIp, uint16_t port);
 int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse);
