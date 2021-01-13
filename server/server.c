@@ -1,4 +1,3 @@
-#include <security/pam_appl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -116,6 +115,14 @@ int main(int argc, char** argv) {
 
     listen(main_sock, client_queue);
     do {
+        // Monitor for client timeouts
+        int timedout_client_fd;
+        while((timedout_client_fd = check_timeouts()) >= 0) {
+            close(timedout_client_fd);
+            list_remove_by_fd(&sockets_list, timedout_client_fd);
+            nfs_log_info(logger, "Disconnected client - timeout");
+        }
+
         timeout_select.tv_sec = select_timeout;
         timeout_select.tv_usec = 0;
         timeout_rw.tv_sec = rw_timeout;
@@ -281,14 +288,6 @@ int main(int argc, char** argv) {
                 }
             }
             disconnected_client: temp = temp->next;
-        }
-
-        // Monitor for timeouts
-        int timedout_client_fd;
-        while((timedout_client_fd = check_timeouts()) >= 0) {
-            close(timedout_client_fd);
-            list_remove_by_fd(&sockets_list, timedout_client_fd);
-            nfs_log_info(logger, "Disconnected client - timeout");
         }
     } while(1);
 }
