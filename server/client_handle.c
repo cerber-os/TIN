@@ -163,9 +163,9 @@ static int _process_client_message(int socket_fd, struct mynfs_message_t* packet
                 return MYNFS_ACCESS_DENIED;
             }
 
-            char* sanitized_path = sanitize_path(path_with_creds);
+            char* sanitized_path = sanitize_path(pure_path);
             if(sanitized_path == NULL) {
-                nfs_log_error(logger, "User provided path is invalid - %s", path_with_creds);
+                nfs_log_error(logger, "User provided path is invalid - %s", pure_path);
                 free(path_with_creds);
                 return MYNFS_INVALID_PATH;
             }
