@@ -87,7 +87,7 @@ int sendAndGetResponse(int socketFd, mynfs_message_t *clientRequest, mynfs_messa
         std::cout<<"* Got "<<recieved_submsg<<"/"<<submsg_size<<" bytes of response submessage"<<std::endl;
     }
 
-    std::cout << "Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
+    std::cout << "* Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
     std::cout << "* Return value: " << (*serverResponse)->return_value << std::endl;
     std::cout << "* Command number: " << (*serverResponse)->cmd << std::endl;
     std::cout << "* Data length: " << submsg_size << std::endl;

@@ -376,7 +376,50 @@ int nfsunlink(std::string &host, std::string &login, std::string &password)
     }
     return 0;
 }
+
+
+int nfsfstat(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
+{
  
+    if(openedDescriptors.empty())
+    {
+        std::cout << "No descriptors opened." << std::endl;
+        return -1;
+    }
+ 
+    auto fd = chooseDescriptor(openedDescriptors);
+    if (fd.first == -1)
+    {
+        std::cout << "Bad file descriptor" << std::endl;
+        return -1;
+    }
+ 
+    struct stat finfo;
+ 
+    int retval = mynfs_fstat(fd.second, fd.first, &finfo);
+    if(retval<0){
+        std::cout << "Cannot fstat" << std::endl;
+        showErrorMsg(retval);
+    }
+    else{
+        std::cout << "Success" << std::endl;
+        std::cout << "   ID of device: "<< finfo.st_dev << std::endl;
+        std::cout << "   Inode number: "<< finfo.st_ino << std::endl;
+        std::cout << "   Protection: "<< finfo.st_mode << std::endl;
+        std::cout << "   Number of hard links: "<< finfo.st_nlink << std::endl;
+        std::cout << "   User ID of owner: "<< finfo.st_uid << std::endl;
+        std::cout << "   Group ID of owner: "<< finfo.st_gid << std::endl;
+        std::cout << "   Device ID (if special file): "<< finfo.st_rdev << std::endl;
+        std::cout << "   Total size, in bytes: "<< finfo.st_size << std::endl;
+        std::cout << "   Blocksize for file system I/O: "<< finfo.st_blksize << std::endl;
+        std::cout << "   Number of 512B blocks allocated: "<< finfo.st_blocks << std::endl;
+        // std::cout << "   Time of last access: "<< finfo.st_atim << std::endl;
+        // std::cout << "   Time of last modification: "<< finfo.st_mtim << std::endl;
+        // std::cout << "   Time of last status change: "<< finfo.st_ctim << std::endl;
+    }
+
+    return retval;
+}
 
 void showHosts(std::vector<Client> &hosts, Client &clientIterator){
     std::cout<< "Hosts available: ,"<< std::endl;
@@ -469,7 +512,7 @@ int main(int argc, char *argv[])
     {
  
         std::cout << "Available commands to run:" <<std::endl;
-        std::cout<< "open, read, write, lseek, close, unlink, exit, hostchange" << std::endl;
+        std::cout<< "open, read, write, lseek, close, unlink, fstat, exit, hostadd, hostchange, show" << std::endl;
         std::getline(std::cin, choice);
         if (choice == "open") nfsopen(currentClient->IpPort, currentClient->openedDescriptors, currentClient->Login, currentClient->Password);
  
@@ -482,12 +525,14 @@ int main(int argc, char *argv[])
         else if (choice == "close") nfsclose(currentClient->IpPort, currentClient->openedDescriptors);
  
         else if (choice == "unlink") nfsunlink(currentClient->IpPort, currentClient->Login, currentClient->Password);
+
+        else if (choice == "fstat") nfsfstat(currentClient->IpPort, currentClient->openedDescriptors);
  
-            else if (choice == "hostchange") changeHost(Clients, *currentClient);
+        else if (choice == "hostchange") changeHost(Clients, *currentClient);
  
-            else if (choice == "hostAdd") addHost(Clients);
+        else if (choice == "hostadd") addHost(Clients);
        
-            //else if (choice == "hostRemove") removeHost(Clients);
+        //else if (choice == "hostRemove") removeHost(Clients);
  
         else if (choice == "show") showHosts(Clients, *currentClient);
  
