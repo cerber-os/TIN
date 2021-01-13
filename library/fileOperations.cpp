@@ -27,8 +27,8 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
     clientSubMsg->mode = mode;
 
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
     free(clientSubMsg);
 
@@ -36,7 +36,7 @@ int mynfs_open(char *host, char *path, int oflag, int mode, int *socketFd){
     clientMsg->handle = 0;
     clientMsg->data_length = sub_msg_size;
 
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
 
     *socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
     if(*socketFd == -1){
@@ -60,15 +60,15 @@ int mynfs_read(int socketFd, int fd, void *buf, size_t count)
     clientSubMsg.length = count;
 
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sizeof(mynfs_read_t));
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t) + sizeof(mynfs_read_t));
     memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_read_t));
 
     clientMsg->cmd= MYNFS_CMD_READ;
     clientMsg->handle = fd;
     clientMsg->data_length = sizeof(mynfs_read_t);
 
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
 
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
         free(clientMsg);
@@ -96,15 +96,15 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
     clientSubMsg->length = buf_length;
  
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
     free(clientSubMsg);
 
     clientMsg->cmd= MYNFS_CMD_WRITE;
     clientMsg->handle = fd;
     clientMsg->data_length = sub_msg_size;
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
         free(clientMsg);
         return -1;
@@ -122,15 +122,15 @@ off_t mynfs_lseek(int socketFd, int fd, off_t offset, int whence){
     clientSubMsg.whence = whence;
 
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sizeof(mynfs_lseek_t));
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t) + sizeof(mynfs_lseek_t));
     memcpy(clientMsg->data, &clientSubMsg, sizeof(mynfs_lseek_t));
 
     clientMsg->cmd= MYNFS_CMD_LSEEK;
     clientMsg->handle = fd;
     clientMsg->data_length = sizeof(mynfs_lseek_t);
 
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
         free(clientMsg);
         return -1;
@@ -145,14 +145,14 @@ int mynfs_close(int socketFd, int fd)
     //brak komunikatu podrzednego
 
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t));
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t));
 
     clientMsg->cmd= MYNFS_CMD_CLOSE;
     clientMsg->handle = fd;
     clientMsg->data_length = 0;
 
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
         free(clientMsg);
         return -1;
@@ -175,8 +175,8 @@ int mynfs_unlink(char *host, char *pathname)
     clientSubMsg->path_length = path_length;
 
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t) + sub_msg_size);
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t) + sub_msg_size);
     memcpy(clientMsg->data, clientSubMsg, sub_msg_size);
     free(clientSubMsg);
 
@@ -184,7 +184,7 @@ int mynfs_unlink(char *host, char *pathname)
     clientMsg->handle = 0;
     clientMsg->data_length = sub_msg_size;
 
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
     int socketFd = createSocket((char*)getIpFromString(string(host)).c_str(), getPortFromString(string(host)));
     if(socketFd == -1){
         free(clientMsg);
@@ -209,14 +209,14 @@ int mynfs_fstat(int socketFd, int fd, struct stat *buf)
     //brak komunikatu podrzednego
     
     //obsluga komunikatu nadrzednego
-    mynfs_datagram_t *clientMsg;
-    clientMsg = (mynfs_datagram_t *)malloc (sizeof (mynfs_datagram_t));
+    mynfs_message_t *clientMsg;
+    clientMsg = (mynfs_message_t *)malloc (sizeof (mynfs_message_t));
 
     clientMsg->cmd= MYNFS_CMD_FSTAT;
     clientMsg->handle = fd;
     clientMsg->data_length = 0;
 
-    mynfs_datagram_t *serverMsg;
+    mynfs_message_t *serverMsg;
     if(sendAndGetResponse(socketFd, clientMsg, &serverMsg) == -1){
         free(clientMsg);
         return -1;

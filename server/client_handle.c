@@ -74,7 +74,7 @@ void close_client(struct client* client) {
 }
 
 
-static void create_simple_response(int cmd, int ret_val, struct mynfs_datagram_t** response, size_t* response_size) {
+static void create_simple_response(int cmd, int ret_val, struct mynfs_message_t** response, size_t* response_size) {
     *response = calloc(1, sizeof(**response));
     if(*response == NULL) {
         nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
@@ -89,7 +89,7 @@ static void create_simple_response(int cmd, int ret_val, struct mynfs_datagram_t
 }
 
 
-static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packet, size_t packet_size, 
+static int _process_client_message(int socket_fd, struct mynfs_message_t* packet, size_t packet_size, 
             char** response, size_t* response_size) {
     *response = NULL;
     *response_size = 0;
@@ -316,9 +316,9 @@ int process_client_message(int socket_fd, void* packet, size_t packet_size, void
     int ret = _process_client_message(socket_fd, packet, packet_size, (char**)response, response_size);
     
     if(*response_size == 0) {
-        create_simple_response(0, ret, (struct mynfs_datagram_t**)response, response_size);
+        create_simple_response(0, ret, (struct mynfs_message_t**)response, response_size);
     } else {
-        struct mynfs_datagram_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
+        struct mynfs_message_t* full_packet = calloc(1, *response_size + sizeof(*full_packet));
         if(full_packet == NULL) {
             nfs_log_error(logger, "Memory allocation failure - %s:%d", __func__, __LINE__);
             *response = NULL;

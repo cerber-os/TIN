@@ -42,7 +42,7 @@ enum mynfs_commands {
 };
 
 
-struct mynfs_datagram_t {
+struct mynfs_message_t {
     union {
         int64_t handle;
         int64_t return_value;

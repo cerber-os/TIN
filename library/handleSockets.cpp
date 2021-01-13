@@ -29,10 +29,10 @@ int createSocket(char *serverIp, uint16_t port) {
     return socketFd;
 }
 
-int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_datagram_t **serverResponse){
+int sendAndGetResponse(int socketFd, mynfs_message_t *clientRequest, mynfs_message_t **serverResponse){
     int rv;
 
-    int request_size = sizeof(mynfs_datagram_t) + clientRequest->data_length;
+    int request_size = sizeof(mynfs_message_t) + clientRequest->data_length;
     int sended_size = 0;
     while(sended_size < request_size)
     {
@@ -48,7 +48,7 @@ int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_data
 
     //Odbieranie response z serwera
     char response[MAX_BUF];
-    size_t header_size = sizeof(mynfs_datagram_t);
+    size_t header_size = sizeof(mynfs_message_t);
 
     //Wczytywanie samego naglowka
     bzero(response, sizeof(response));
@@ -68,7 +68,7 @@ int sendAndGetResponse(int socketFd, mynfs_datagram_t *clientRequest, mynfs_data
         std::cout<<"* Got "<<recieved_header<<"/"<<header_size<<" bytes of response header"<<std::endl;
     }
 
-    (*serverResponse) = (mynfs_datagram_t *) response;
+    (*serverResponse) = (mynfs_message_t *) response;
     size_t submsg_size = (*serverResponse)->data_length;
 
     int recieved_submsg = 0;

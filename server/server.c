@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
                 disconnect_client = 0;
                 bzero(buffer, sizeof(buffer));
                 rw_len = 0;
-                header_len = sizeof(struct mynfs_datagram_t);
+                header_len = sizeof(struct mynfs_message_t);
                 while(rw_len < header_len)
                 {
                     rv = read(temp->fd, buffer + rw_len, header_len - rw_len);
@@ -252,7 +252,7 @@ int main(int argc, char** argv) {
                 }
 
                 rw_len = 0;
-                data_len = ((struct mynfs_datagram_t*) buffer)->data_length;
+                data_len = ((struct mynfs_message_t*) buffer)->data_length;
                 while(rw_len < data_len)
                 {
                     rv = read(temp->fd, buffer + rw_len + header_len, data_len - rw_len);
