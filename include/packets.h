@@ -22,6 +22,7 @@ enum mynfs_error_code {
     MYNFS_OVERLOAD,
     MYNFS_INVALID_PATH,
     MYNFS_ALREADY_LOCKED,
+    MYNFS_ACCESS_DENIED,
 
     // Others
     MYNFS_CLOSED            = -100,

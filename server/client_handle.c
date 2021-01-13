@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#include "auth.h"
 #include "client_handle.h"
 #include "logger.h"
 #include "packets.h"
@@ -16,6 +17,28 @@
 extern struct nfs_logger* logger;
 extern char* nfs_path;
 struct client clients[MAX_CLIENTS_COUNT];
+
+int check_auth_from_path(char* path_with_cred, char** pure_path) {
+    char* username = strsep(&path_with_cred, ":");
+    char* password = strsep(&path_with_cred, "@");
+    if(path_with_cred == NULL) {
+        nfs_log_warn(logger, "Path is missing authorization details - ignore for presentation");
+        *pure_path = username;
+        return 0;
+    }
+
+    int are_ok = are_credentials_ok(username, password);
+    if(!are_ok) {
+        nfs_log_error(logger, "Access denied for client");
+        *pure_path = NULL;
+        return 1;
+    }
+
+    nfs_log_info(logger, "Credentials given by user are correct");
+
+    *pure_path = path_with_cred;
+    return 0;
+}
 
 char* sanitize_path(char* path) {
     size_t path_length = strlen(path);
@@ -132,15 +155,21 @@ static int _process_client_message(int socket_fd, struct mynfs_message_t* packet
                 return MYNFS_ALREADY_OPENED;
             }
 
-            char* path_name = strndup((char*)open_data->name, open_data->path_length);
-            char* sanitized_path = sanitize_path(path_name);
+            char* path_with_creds = strndup((char*)open_data->name, open_data->path_length);
+            char* pure_path = NULL;
+            int is_invalid = check_auth_from_path(path_with_creds, &pure_path);
+            if(is_invalid) {
+                free(path_with_creds);
+                return MYNFS_ACCESS_DENIED;
+            }
 
+            char* sanitized_path = sanitize_path(path_with_creds);
             if(sanitized_path == NULL) {
-                nfs_log_error(logger, "User provided path is invalid - %s", path_name);
-                free(path_name);
+                nfs_log_error(logger, "User provided path is invalid - %s", path_with_creds);
+                free(path_with_creds);
                 return MYNFS_INVALID_PATH;
             }
-            free(path_name);
+            free(path_with_creds);
 
             // Handle lock flag
             if(open_data->oflag & O_MYNFS_LOCK) {
@@ -271,14 +300,21 @@ static int _process_client_message(int socket_fd, struct mynfs_message_t* packet
                 return MYNFS_INVALID_PACKET;
             }
 
-            char* path_name = strndup((char*)unlink_data->name, unlink_data->path_length);
-            char* sanitized_path = sanitize_path(path_name);
+            char* path_with_creds = strndup((char*)unlink_data->name, unlink_data->path_length);
+            char* pure_path = NULL;
+            int is_invalid = check_auth_from_path(path_with_creds, &pure_path);
+            if(is_invalid) {
+                free(path_with_creds);
+                return MYNFS_ACCESS_DENIED;
+            }
+
+            char* sanitized_path = sanitize_path(pure_path);
             if(sanitized_path == NULL) {
-                nfs_log_error(logger, "User provided path is invalid - %s", path_name);
-                free(path_name);
+                nfs_log_error(logger, "User provided path is invalid - %s", pure_path);
+                free(path_with_creds);
                 return MYNFS_INVALID_PATH;
             }
-            free(path_name);
+            free(path_with_creds);
 
 
             int ret = unlink(sanitized_path);
