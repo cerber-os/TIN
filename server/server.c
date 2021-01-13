@@ -121,6 +121,7 @@ int main(int argc, char** argv) {
 
     // create listening socket
     int main_sock, sub_socket, max_fd, ready_sockets, rv, sock_opt = 1;
+    int disconnect_client;
     struct sockaddr_in server;
     fd_set read_fds;
     char *response;
@@ -222,6 +223,7 @@ int main(int argc, char** argv) {
         {
             if (FD_ISSET(temp->fd, &read_fds)) 
             {
+                disconnect_client = 0;
                 bzero(buffer, sizeof(buffer));
                 rw_len = 0;
                 header_len = sizeof(struct mynfs_datagram_t);
@@ -282,12 +284,11 @@ int main(int argc, char** argv) {
                 rv = process_client_message(temp->fd, buffer, header_len + data_len, (void**) &response, &response_len);
                 if(rv == MYNFS_CLOSED)
                 {
-                    free(response);
-                    close(temp->fd);
-                    temp = list_remove_by_fd(&sockets_list, temp->fd);
-                    nfs_log_info(logger, "Connection with remote client closed");
+                    disconnect_client = 1;
+                    nfs_log_debug(logger, "Client sent disconnect packet");
                 }
-                else if(response != NULL)
+                
+                if(response != NULL)
                 {
                     rw_len = 0;
                     while(rw_len < response_len)
@@ -322,6 +323,13 @@ int main(int argc, char** argv) {
                 }
                 else
                     nfs_log_error(logger, "Failed to prepare response - response == NULL");
+
+                if(disconnect_client) {
+                    // close_client has been called by process_client_message
+                    close(temp->fd);
+                    temp = list_remove_by_fd(&sockets_list, temp->fd);
+                    nfs_log_info(logger, "Connection with remote client closed");
+                }
             }
             disconnected_client: temp = temp->next;
         }
