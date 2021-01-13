@@ -77,7 +77,7 @@ void getDataFromSocket(int new_socket) {
     }
     std::cout<<std::endl<<"Otrzymano bajtow: "<<bytes<<std::endl;
 
-    mynfs_datagram_t *received_message = (mynfs_datagram_t *) buf;
+    mynfs_message_t *received_message = (mynfs_message_t *) buf;
     std::cout<<"CMD: "<< received_message->cmd<<std::endl;
     std::cout<<"Handle: "<< received_message->handle<<std::endl;
     std::cout<<"Data length: "<< received_message->data_length<<std::endl;
