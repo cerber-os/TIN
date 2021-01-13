@@ -1,6 +1,7 @@
 #include<iostream>  
  
 #include "../library/fileOperations.h"
+#include "../include/packets.h"
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -52,30 +53,33 @@ string getIp (string host){
  
 void showErrorMsg(int errorNumber){
     switch( errorNumber ) {
-        case -1000:
+        case MYNFS_INVALID_CLIENT:
             std::cout << "MYNFS_INVALID_CLIENT " << std::endl;
             break;
  
-        case -500:
+        case MYNFS_INVALID_PACKET:
             std::cout << "MYNFS_INVALID_PACKET " << std::endl;
             break;
  
-        case -499:
+        case MYNFS_UNKNOWN_COMMAND:
             std::cout << "MYNFS_UNKNOWN_COMMAND " << std::endl;
             break;
-        case -498:
+        case MYNFS_ALREADY_OPENED:
             std::cout << "MYNFS_ALREADY_OPENED " << std::endl;
             break;
  
-        case -497:
+        case MYNFS_OVERLOAD:
             std::cout << "MYNFS_OVERLOAD " << std::endl;
             break;
  
-        case -496:
+        case MYNFS_INVALID_PATH:
             std::cout << "MYNFS_INVALID_PATH " << std::endl;
             break;
  
-        case -495:
+        case MYNFS_ALREADY_LOCKED:
+            std::cout << "MYNFS_ALREADY_LOCKED " << std::endl;
+            break;
+        case MYNFS_ACCESS_DENIED:
             std::cout << "MYNFS_ALREADY_LOCKED " << std::endl;
             break;
     }
@@ -188,6 +192,7 @@ int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
     std::getline(std::cin, path);
 
     std::string whole_path = login + ":" + password + "@" + path;
+    std::cout<<"[DEBUG] Tak wyglada caly wysylany path: "<<whole_path<<std::endl;
 
     std::cout << "Oflag/s:" << std::endl;
     std::cout << "Choose flag: RDONLY | WRONLY | RDWR | CREAT | LOCK" << std::endl;
