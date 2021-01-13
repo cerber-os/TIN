@@ -94,6 +94,13 @@ std::pair<int, int> findDescriptorsPair(int fd, std::vector<std::pair<int, int>>
     return std::make_pair(-1, -1);
 }
 
+ bool check_number(string str) {
+    for (int i = 0; i < str.length(); i++)
+        if (isdigit(str[i]) == false)
+            return false;
+    return true;
+}
+
 std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDescriptors)
 {   bool correctFdFound = false;
     int fd;
@@ -106,19 +113,23 @@ std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDes
  
         std::string fdStr;
         std::getline(std::cin, fdStr);
-        fd = std::stoi(fdStr);
-        chosenFd = findDescriptorsPair(fd, openedDescriptors);
-
-        if(chosenFd.first != -1){
-            correctFdFound = true;
+        if(check_number(fdStr)){
+            fd = std::stoi(fdStr);
+            chosenFd = findDescriptorsPair(fd, openedDescriptors);
+            if(chosenFd.first != -1){
+                correctFdFound = true;
+            }
+            else{
+                std::cout << "Cant find your descriptor, try again  ";
+            }
         }
         else{
-            std::cout << "Cant find your descriptor, try again  ";
+            std::cout << "Given input is not a number"<< std::endl;
         }
     }
     return chosenFd;
 }
- 
+
  
 int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
 {
