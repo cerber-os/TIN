@@ -289,7 +289,10 @@ static int _process_client_message(int socket_fd, struct mynfs_datagram_t* packe
             }
 
             free(sanitized_path);
-            return MYNFS_SUCCESS;
+
+            // Unlink is one-shot command - disconnect after processing it
+            close_client(client);
+            return MYNFS_CLOSED;
         }
         break;
 

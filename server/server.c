@@ -285,7 +285,7 @@ int main(int argc, char** argv) {
                 if(rv == MYNFS_CLOSED)
                 {
                     disconnect_client = 1;
-                    nfs_log_debug(logger, "Client sent disconnect packet");
+                    nfs_log_debug(logger, "Client will be disconnected");
                 }
                 
                 if(response != NULL)
