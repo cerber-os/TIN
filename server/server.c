@@ -335,8 +335,8 @@ int main(int argc, char** argv) {
         }
 
         // Monitor for timeouts
-        int timedout_client_fd = check_timeouts();
-        if(timedout_client_fd >= 0) {
+        int timedout_client_fd;
+        while((timedout_client_fd = check_timeouts()) >= 0) {
             close(timedout_client_fd);
             list_remove_by_fd(&sockets_list, timedout_client_fd);
             nfs_log_info(logger, "Disconnected client - timeout");
