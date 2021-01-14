@@ -86,7 +86,7 @@ ssize_t mynfs_write(int socketFd, int fd, void *buf, size_t count)
 {  
     char *bufor = (char *)buf;
 
-    int buf_length = strlen(bufor);
+    int buf_length = count;
     int sub_msg_size = sizeof(mynfs_write_t) + buf_length + 1;
     //obsluga komunikatu podrzednego
    
