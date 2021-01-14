@@ -12,9 +12,9 @@ endif
 
 all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
 
-debug: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/libTestServer out/mynfs_library.so
+debug: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
 
-asan_lsan: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/libTestServer out/mynfs_library.so
+asan_lsan: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
 
 tests: out/01-read-write out/02-flock
 
