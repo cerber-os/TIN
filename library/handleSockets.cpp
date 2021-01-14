@@ -43,7 +43,7 @@ int sendAndGetResponse(int socketFd, mynfs_message_t *clientRequest, mynfs_messa
             return -1;
         }
         sended_size += rv; 
-        std::cout<<"* Sent "<<sended_size<<"/"<<request_size<<" bytes of request"<<std::endl;         
+        // std::cout<<"* Sent "<<sended_size<<"/"<<request_size<<" bytes of request"<<std::endl;         
     }
 
     //Odbieranie response z serwera
@@ -65,7 +65,7 @@ int sendAndGetResponse(int socketFd, mynfs_message_t *clientRequest, mynfs_messa
             return -1;
         }
         recieved_header += rv; 
-        std::cout<<"* Got "<<recieved_header<<"/"<<header_size<<" bytes of response header"<<std::endl;
+        // std::cout<<"* Got "<<recieved_header<<"/"<<header_size<<" bytes of response header"<<std::endl;
     }
 
     (*serverResponse) = (mynfs_message_t *) response;
@@ -84,13 +84,13 @@ int sendAndGetResponse(int socketFd, mynfs_message_t *clientRequest, mynfs_messa
             return -1;
         }
         recieved_submsg += rv;
-        std::cout<<"* Got "<<recieved_submsg<<"/"<<submsg_size<<" bytes of response submessage"<<std::endl;
+        // std::cout<<"* Got "<<recieved_submsg<<"/"<<submsg_size<<" bytes of response submessage"<<std::endl;
     }
 
-    std::cout << "* Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
-    std::cout << "* Return value: " << (*serverResponse)->return_value << std::endl;
-    std::cout << "* Command number: " << (*serverResponse)->cmd << std::endl;
-    std::cout << "* Data length: " << submsg_size << std::endl;
+    // std::cout << "* Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
+    // std::cout << "* Return value: " << (*serverResponse)->return_value << std::endl;
+    // std::cout << "* Command number: " << (*serverResponse)->cmd << std::endl;
+    // std::cout << "* Data length: " << submsg_size << std::endl;
 
     return recieved_header + recieved_submsg;
 }
