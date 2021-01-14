@@ -492,7 +492,7 @@ void changeHost( std::vector<Client> &clients , Client** clientPointer){
     }
 }
  
-void addHost(std::vector<Client> &clients){
+void addHost(std::vector<Client> &clients, Client** clientPointer){
 if(clients.size() > 2){
     std::cout<< "Cannot add more hosts,"<< std::endl;
     return;
@@ -504,6 +504,7 @@ else {
     type_login_and_username(&tempClient);
     clients.push_back(tempClient);
     std::cout<< "Host added"<< std::endl;
+    *clientPointer = &clients.back();
     return;
 }
 }
@@ -573,7 +574,7 @@ int main(int argc, char *argv[])
  
         else if (choice == "hostchange") changeHost(Clients, &currentClient);
  
-        else if (choice == "hostadd") addHost(Clients);
+        else if (choice == "hostadd") addHost(Clients, &currentClient);
        
         //else if (choice == "hostRemove") removeHost(Clients);
  
