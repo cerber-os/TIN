@@ -190,12 +190,10 @@ uint16_t orWord(uint16_t value, uint16_t word)
     return value | word;
 }
  
-void type_login_and_username_again(Client* client_pointer){
-    std::cout << "Type valid username and password" << std::endl;
+void type_login_and_username(Client* client_pointer){
     std::cout << "Login:" << std::endl;
     std::getline(std::cin, client_pointer->Login);
-    std::cout << "Password:" << std::endl;
-    std::getline(std::cin, client_pointer->Password);
+    client_pointer->Password.assign(getpass("Password: "));
 }
 
  
@@ -245,8 +243,9 @@ int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
         std::cout << "Cannot open" << std::endl;
         showErrorMsg(fd);
         if (fd == MYNFS_ACCESS_DENIED){
-            type_login_and_username_again(client_pointer);
-            std::cout << "Try again..." << std::endl;
+            std::cout << "Type valid username and password" << std::endl;
+            type_login_and_username(client_pointer);
+            std::cout << "Try again your command" << std::endl;
         }
     }
     else{
@@ -409,8 +408,9 @@ int nfsunlink(std::string &host, std::string &login, std::string &password, Clie
         std::cout << "Cannot unlink" << std::endl;
         showErrorMsg(retval);
         if (retval == MYNFS_ACCESS_DENIED){
-            type_login_and_username_again(client_pointer);
-            std::cout << "Try again..." << std::endl;
+            std::cout << "Type valid username and password" << std::endl;
+            type_login_and_username(client_pointer);
+            std::cout << "Try again your command" << std::endl;
         }
     }
     return 0;
@@ -468,17 +468,17 @@ int nfsfstat(std::string &host, std::vector<std::pair<int, int>> &openedDescript
     return retval;
 }
 
-void showHosts(std::vector<Client> &hosts, Client &clientIterator){
+void showHosts(std::vector<Client> &hosts, Client* clientpointer){
     std::cout<< "Hosts available:"<< std::endl;
     for (std::vector<Client>::const_iterator i = hosts.begin(); i != hosts.end(); ++i)
         std::cout << i->IpPort << ' ';
-    std::cout<< "Current host: "<< clientIterator.IpPort << std::endl;
+    std::cout<< "Current host: "<< clientpointer->IpPort << std::endl;
  
 }
 
 void changeHost( std::vector<Client> &clients , Client** clientPointer){
  
-    showHosts(clients, **clientPointer);
+    showHosts(clients, *clientPointer);
     string index;
     std::cout<< "Give host index to change (indexes start from 0): "<< std::endl;
     std::getline(std::cin, index);
@@ -501,10 +501,7 @@ else {
     Client tempClient;
     std::cout << "Server address (IP:PORT):" << std::endl;
     std::getline(std::cin, tempClient.IpPort);
-    std::cout << "Login:" << std::endl;
-    std::getline(std::cin, tempClient.Login);
-    std::cout << "Password:" << std::endl;
-    std::getline(std::cin, tempClient.Password);
+    type_login_and_username(&tempClient);
     clients.push_back(tempClient);
     std::cout<< "Host added"<< std::endl;
     return;
@@ -547,9 +544,7 @@ int main(int argc, char *argv[])
     std::cout << "Welcome to MyNFS!\n";
     std::cout << "Server address (IP:PORT):" << std::endl;
     std::getline(std::cin, client.IpPort);
-    std::cout << "Login:" << std::endl;
-    std::getline(std::cin, client.Login);
-    client.Password.assign(getpass("Password: "));
+    type_login_and_username(&client);
     Clients.push_back(client);
     client.openedDescriptors = openedDescriptors;
     client.pathnames = pathnames;
@@ -582,7 +577,7 @@ int main(int argc, char *argv[])
        
         //else if (choice == "hostRemove") removeHost(Clients);
  
-        else if (choice == "show") showHosts(Clients, *currentClient);
+        else if (choice == "show") showHosts(Clients, currentClient);
  
         else if (choice == "exit")
         {
