@@ -113,7 +113,7 @@ std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDes
  
         std::string fdStr;
         std::getline(std::cin, fdStr);
-        if(check_number(fdStr)){
+        if(check_number(fdStr) && !fdStr.empty()){
             fd = std::stoi(fdStr);
             chosenFd = findDescriptorsPair(fd, openedDescriptors);
             if(chosenFd.first != -1){
@@ -414,42 +414,53 @@ int nfsfstat(std::string &host, std::vector<std::pair<int, int>> &openedDescript
     }
     else{
         std::cout << "Success" << std::endl;
-        std::cout << "   ID of device: "<< finfo.st_dev << std::endl;
-        std::cout << "   Inode number: "<< finfo.st_ino << std::endl;
-        std::cout << "   Protection: "<< finfo.st_mode << std::endl;
-        std::cout << "   Number of hard links: "<< finfo.st_nlink << std::endl;
-        std::cout << "   User ID of owner: "<< finfo.st_uid << std::endl;
-        std::cout << "   Group ID of owner: "<< finfo.st_gid << std::endl;
-        std::cout << "   Device ID (if special file): "<< finfo.st_rdev << std::endl;
-        std::cout << "   Total size, in bytes: "<< finfo.st_size << std::endl;
-        std::cout << "   Blocksize for file system I/O: "<< finfo.st_blksize << std::endl;
-        std::cout << "   Number of 512B blocks allocated: "<< finfo.st_blocks << std::endl;
-        // std::cout << "   Time of last access: "<< finfo.st_atim << std::endl;
-        // std::cout << "   Time of last modification: "<< finfo.st_mtim << std::endl;
-        // std::cout << "   Time of last status change: "<< finfo.st_ctim << std::endl;
+        std::cout << "   ID of device:                      "<< finfo.st_dev << std::endl;
+        std::cout << "   Inode number:                      "<< finfo.st_ino << std::endl;
+        std::cout << "   Protection:                        "<< finfo.st_mode << std::endl;
+        std::cout << "   Number of hard links:              "<< finfo.st_nlink << std::endl;
+        std::cout << "   User ID of owner:                  "<< finfo.st_uid << std::endl;
+        std::cout << "   Group ID of owner:                 "<< finfo.st_gid << std::endl;
+        std::cout << "   Device ID (if special file):       "<< finfo.st_rdev << std::endl;
+        std::cout << "   Total size, in bytes:              "<< finfo.st_size << std::endl;
+        std::cout << "   Blocksize for file system I/O:     "<< finfo.st_blksize << std::endl;
+        std::cout << "   Number of 512B blocks allocated:   "<< finfo.st_blocks << std::endl;
+        char buff[20];
+        struct tm * timeinfo;
+        timeinfo = localtime (&finfo.st_atime);
+        strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M", timeinfo);
+        std::cout << "   Time of last access:               "<< buff << std::endl;
+        timeinfo = localtime (&finfo.st_mtime);
+        strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M", timeinfo);
+        std::cout << "   Time of last modification:         "<< buff << std::endl;
+        timeinfo = localtime (&finfo.st_ctime);
+        strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M", timeinfo);
+        std::cout << "   Time of last status change:        "<< buff << std::endl;
     }
 
     return retval;
 }
 
 void showHosts(std::vector<Client> &hosts, Client &clientIterator){
-    std::cout<< "Hosts available: ,"<< std::endl;
+    std::cout<< "Hosts available:"<< std::endl;
     for (std::vector<Client>::const_iterator i = hosts.begin(); i != hosts.end(); ++i)
         std::cout << i->IpPort << ' ';
     std::cout<< "Current host: "<< clientIterator.IpPort << std::endl;
  
 }
 
-void changeHost( std::vector<Client> &clients , Client &clientIterator){
+void changeHost( std::vector<Client> &clients , Client** clientPointer){
  
-    showHosts(clients, clientIterator);
+    showHosts(clients, **clientPointer);
     string index;
     std::cout<< "Give host index to change (indexes start from 0): "<< std::endl;
     std::getline(std::cin, index);
-    if(clients.size() > std::stoi(index) && std::stoi(index)>=0){
-        clientIterator = clients[std::stoi(index)];
+    if(check_number(index) && !index.empty() && clients.size() > std::stoi(index) && std::stoi(index)>=0){
         std::cout<< "Host Changed"<< std::endl;
-        std::cout<< "CurrentHost:  "<< clientIterator.IpPort<< std::endl;
+        std::cout<< "CurrentHost:  "<< (*clientPointer)->IpPort<< std::endl;
+        *clientPointer = &clients[std::stoi(index)];
+    }
+    else{
+        std::cout<< "Wrong index"<< std::endl;
     }
 }
  
@@ -493,18 +504,15 @@ else {
 }*/
  
  
- 
 int main(int argc, char *argv[])
 {
  
-    //TO DO 3 wektory deskrytporów dla 3 hostów narazie jest jedna
     std::vector<Client> Clients;
     Client client;
     Client *currentClient;  //wskaznik na aktualnego klienta
     std::string choice;
-    std::string currentHost;
-    std::vector<Client>::iterator currentClientIterator;
-    std::vector<std::string> hosts;
+    // std::string currentHost;
+    // std::vector<std::string> hosts;
     std::vector<std::pair<int, int>> openedDescriptors;     //para na deskryptor pliku + deskryptor socketa
     bool exit = false;
     std::cout << "Welcome to MyNFS!\n";
@@ -539,7 +547,7 @@ int main(int argc, char *argv[])
 
         else if (choice == "fstat") nfsfstat(currentClient->IpPort, currentClient->openedDescriptors);
  
-        else if (choice == "hostchange") changeHost(Clients, *currentClient);
+        else if (choice == "hostchange") changeHost(Clients, &currentClient);
  
         else if (choice == "hostadd") addHost(Clients);
        
