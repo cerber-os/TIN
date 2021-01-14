@@ -1,4 +1,5 @@
-#include<iostream>  
+#include <iostream>  
+#include <cstdlib>
  
 #include "../library/fileOperations.h"
 #include "../include/packets.h"
@@ -532,8 +533,7 @@ int main(int argc, char *argv[])
     std::getline(std::cin, client.IpPort);
     std::cout << "Login:" << std::endl;
     std::getline(std::cin, client.Login);
-    std::cout << "Password:" << std::endl;
-    std::getline(std::cin, client.Password);
+    client.Password.assign(getpass("Password: "));
     Clients.push_back(client);
     client.openedDescriptors = openedDescriptors;
     client.pathnames = pathnames;
