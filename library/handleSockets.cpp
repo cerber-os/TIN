@@ -16,7 +16,7 @@ int createSocket(char *serverIp, uint16_t port) {
 
     //Convert IPv4 and IPv6 addresses from text to binary form
     if (inet_pton(AF_INET, serverIp, &serv_addr.sin_addr) <= 0) {
-        std::cout << "Error in inet_pton: probably invalid ip" << std::endl;
+        std::cout << "Error in inet_pton: probably invalid IP" << std::endl;
         return -1;
     }
 
@@ -87,7 +87,7 @@ int sendAndGetResponse(int socketFd, mynfs_message_t *clientRequest, mynfs_messa
         std::cout<<"* Got "<<recieved_submsg<<"/"<<submsg_size<<" bytes of response submessage"<<std::endl;
     }
 
-    std::cout << "Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
+    std::cout << "* Response was received ("<<recieved_header + recieved_submsg<<" bytes)" << std::endl;
     std::cout << "* Return value: " << (*serverResponse)->return_value << std::endl;
     std::cout << "* Command number: " << (*serverResponse)->cmd << std::endl;
     std::cout << "* Data length: " << submsg_size << std::endl;

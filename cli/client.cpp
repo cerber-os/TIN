@@ -16,6 +16,7 @@ class Client{
     public: std::string Login;
     public: std::string Password;
     public: std::vector<std::pair<int, int>> openedDescriptors;
+    public: std::vector<std::string> pathnames;
     
     Client(){
             IpPort ="";
@@ -94,33 +95,44 @@ std::pair<int, int> findDescriptorsPair(int fd, std::vector<std::pair<int, int>>
     return std::make_pair(-1, -1);
 }
 
-std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDescriptors)
+bool check_number(string str) {
+    for (int i = 0; i < str.length(); i++)
+        if (isdigit(str[i]) == false)
+            return false;
+    return true;
+}
+
+std::pair<int, int> chooseDescriptor(std::vector<std::pair<int, int>> &openedDescriptors, std::vector<std::string> &pathnames)
 {   bool correctFdFound = false;
     int fd;
     pair<int, int> chosenFd;
     while(!correctFdFound){
-        std::cout << "Choose descriptor from: ";
-        for (auto d : openedDescriptors)
-            std::cout << d.first << " ";
-        std::cout << std::endl;
+        std::cout << "Choose descriptor: type number"<<std::endl;
+        for (int i=0; i<openedDescriptors.size(); i++){
+            std::cout << "   " << openedDescriptors[i].first << ") " << pathnames[i] << std::endl;
+        }
  
         std::string fdStr;
         std::getline(std::cin, fdStr);
-        fd = std::stoi(fdStr);
-        chosenFd = findDescriptorsPair(fd, openedDescriptors);
-
-        if(chosenFd.first != -1){
-            correctFdFound = true;
+        if(!fdStr.empty() && check_number(fdStr)){
+            fd = std::stoi(fdStr);
+            chosenFd = findDescriptorsPair(fd, openedDescriptors);
+            if(chosenFd.first != -1){
+                correctFdFound = true;
+            }
+            else{
+                std::cout << "Cant find your descriptor, try again  ";
+            }
         }
         else{
-            std::cout << "Cant find your descriptor, try again  ";
+            std::cout << "Given input is not a number"<< std::endl;
         }
     }
     return chosenFd;
 }
+
  
- 
-int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
+int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::vector<std::string> &pathnames)
 {
     int16_t count;
     std::string scount;
@@ -134,7 +146,7 @@ int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
         return -1;
     }
  
-    auto fd = chooseDescriptor(openedDescriptors);
+    auto fd = chooseDescriptor(openedDescriptors, pathnames);
     if (fd.first == -1)
     {
         std::cout << "Bad file descriptor" << std::endl;
@@ -143,6 +155,10 @@ int nfsread(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
  
     std::cout << "Bytes to read:" << std::endl;
     std::getline(std::cin, scount);
+    if(scount.empty() || !check_number(scount)){
+        std::cout << "Wrong input" << std::endl;
+        return -1;
+    }
     count = static_cast<int16_t>(std::stoi(scount));
  
     int16_t size = mynfs_read(fd.second, fd.first, pBuf, count);
@@ -174,7 +190,7 @@ uint16_t orWord(uint16_t value, uint16_t word)
 }
  
  
-int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::string &login, std::string &password)
+int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::string &login, std::string &password, std::vector<std::string> &pathnames)
 {
     std::string path;
     uint16_t oflag = 0;
@@ -192,9 +208,7 @@ int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
     std::getline(std::cin, path);
 
     std::string whole_path = login + ":" + password + "@" + path;
-    std::cout<<"[DEBUG] Tak wyglada caly wysylany path: "<<whole_path<<std::endl;
 
-    std::cout << "Oflag/s:" << std::endl;
     std::cout << "Choose flag: RDONLY | WRONLY | RDWR | CREAT | LOCK" << std::endl;
     std::cout << "In order to use more flags write them one after another with spaces." << std::endl;
     std::getline(std::cin, soflag);
@@ -226,13 +240,14 @@ int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
         std::cout << "Success" << std::endl;
         std::cout << "Opened file descriptor: " << fd << std::endl;
         openedDescriptors.push_back(std::make_pair(fd, socketFd));
+        pathnames.push_back(path);
     }
  
     return fd;
 }
  
  
-int nfswrite(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
+int nfswrite(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::vector<std::string> &pathnames)
 {
     std::string buf;
  
@@ -244,7 +259,7 @@ int nfswrite(std::string &host, std::vector<std::pair<int, int>> &openedDescript
         return -1;
     }
  
-    auto fd = chooseDescriptor(openedDescriptors);
+    auto fd = chooseDescriptor(openedDescriptors, pathnames);
     if (fd.first == -1)
     {
         std::cout << "Bad file descriptor" << std::endl;
@@ -270,7 +285,7 @@ int nfswrite(std::string &host, std::vector<std::pair<int, int>> &openedDescript
     return size;
 }
  
-int nfslseek(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors){
+int nfslseek(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::vector<std::string> &pathnames){
     std::string soffset;
     int32_t offset;
     std::string swhence;
@@ -284,7 +299,7 @@ int nfslseek(std::string &host, std::vector<std::pair<int, int>> &openedDescript
         return -1;
     }
  
-    auto fd = chooseDescriptor(openedDescriptors);
+    auto fd = chooseDescriptor(openedDescriptors, pathnames);
     if (fd.first == -1)
     {
         std::cout << "Bad file descriptor" << std::endl;
@@ -300,6 +315,10 @@ int nfslseek(std::string &host, std::vector<std::pair<int, int>> &openedDescript
     std::getline(std::cin, swhence);
     std::cout << "Offset:" << std::endl;
     std::getline(std::cin, soffset);
+    if(soffset.empty() || !check_number(soffset)){
+        std::cout << "Wrong input" << std::endl;
+        return -1;
+    }
     offset = static_cast<int32_t>(std::stoi(soffset));
  
     it = flags.find(swhence);
@@ -327,7 +346,7 @@ int nfslseek(std::string &host, std::vector<std::pair<int, int>> &openedDescript
 }
  
  
-int nfsclose(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors)
+int nfsclose(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::vector<std::string> &pathnames)
 {
     if(openedDescriptors.empty())
     {
@@ -335,7 +354,7 @@ int nfsclose(std::string &host, std::vector<std::pair<int, int>> &openedDescript
         return -1;
     }
  
-    auto fd = chooseDescriptor(openedDescriptors);
+    auto fd = chooseDescriptor(openedDescriptors, pathnames);
     if (fd.first == -1)
     {
         std::cout << "Bad file descriptor" << std::endl;
@@ -346,6 +365,9 @@ int nfsclose(std::string &host, std::vector<std::pair<int, int>> &openedDescript
 
     if(retval == -100){
         std::cout << "Success" << std::endl;
+        std::vector<std::pair<int, int>>::iterator itr = std::find(openedDescriptors.begin(), openedDescriptors.end(), fd);
+        int index = std::distance(openedDescriptors.begin(), itr);
+        pathnames.erase(pathnames.begin() + index);
         openedDescriptors.erase(std::remove(openedDescriptors.begin(), openedDescriptors.end(), fd),
                                 openedDescriptors.end());
     }
@@ -376,26 +398,80 @@ int nfsunlink(std::string &host, std::string &login, std::string &password)
     }
     return 0;
 }
+
+
+int nfsfstat(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::vector<std::string> &pathnames)
+{
  
+    if(openedDescriptors.empty())
+    {
+        std::cout << "No descriptors opened." << std::endl;
+        return -1;
+    }
+ 
+    auto fd = chooseDescriptor(openedDescriptors, pathnames);
+    if (fd.first == -1)
+    {
+        std::cout << "Bad file descriptor" << std::endl;
+        return -1;
+    }
+ 
+    struct stat finfo;
+ 
+    int retval = mynfs_fstat(fd.second, fd.first, &finfo);
+    if(retval<0){
+        std::cout << "Cannot fstat" << std::endl;
+        showErrorMsg(retval);
+    }
+    else{
+        std::cout << "Success" << std::endl;
+        std::cout << "   ID of device:                      "<< finfo.st_dev << std::endl;
+        std::cout << "   Inode number:                      "<< finfo.st_ino << std::endl;
+        std::cout << "   Protection:                        "<< finfo.st_mode << std::endl;
+        std::cout << "   Number of hard links:              "<< finfo.st_nlink << std::endl;
+        std::cout << "   User ID of owner:                  "<< finfo.st_uid << std::endl;
+        std::cout << "   Group ID of owner:                 "<< finfo.st_gid << std::endl;
+        std::cout << "   Device ID (if special file):       "<< finfo.st_rdev << std::endl;
+        std::cout << "   Total size, in bytes:              "<< finfo.st_size << std::endl;
+        std::cout << "   Blocksize for file system I/O:     "<< finfo.st_blksize << std::endl;
+        std::cout << "   Number of 512B blocks allocated:   "<< finfo.st_blocks << std::endl;
+        char buff[20];
+        struct tm * timeinfo;
+        timeinfo = localtime (&finfo.st_atime);
+        strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M", timeinfo);
+        std::cout << "   Time of last access:               "<< buff << std::endl;
+        timeinfo = localtime (&finfo.st_mtime);
+        strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M", timeinfo);
+        std::cout << "   Time of last modification:         "<< buff << std::endl;
+        timeinfo = localtime (&finfo.st_ctime);
+        strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M", timeinfo);
+        std::cout << "   Time of last status change:        "<< buff << std::endl;
+    }
+
+    return retval;
+}
 
 void showHosts(std::vector<Client> &hosts, Client &clientIterator){
-    std::cout<< "Hosts available: ,"<< std::endl;
+    std::cout<< "Hosts available:"<< std::endl;
     for (std::vector<Client>::const_iterator i = hosts.begin(); i != hosts.end(); ++i)
         std::cout << i->IpPort << ' ';
     std::cout<< "Current host: "<< clientIterator.IpPort << std::endl;
  
 }
 
-void changeHost( std::vector<Client> &clients , Client &clientIterator){
+void changeHost( std::vector<Client> &clients , Client** clientPointer){
  
-    showHosts(clients, clientIterator);
+    showHosts(clients, **clientPointer);
     string index;
     std::cout<< "Give host index to change (indexes start from 0): "<< std::endl;
     std::getline(std::cin, index);
-    if(clients.size() > std::stoi(index) && std::stoi(index)>=0){
-        clientIterator = clients[std::stoi(index)];
+    if(!index.empty() && check_number(index) && clients.size() > std::stoi(index) && std::stoi(index)>=0){
         std::cout<< "Host Changed"<< std::endl;
-        std::cout<< "CurrentHost:  "<< clientIterator.IpPort<< std::endl;
+        std::cout<< "CurrentHost:  "<< (*clientPointer)->IpPort<< std::endl;
+        *clientPointer = &clients[std::stoi(index)];
+    }
+    else{
+        std::cout<< "Wrong index"<< std::endl;
     }
 }
  
@@ -439,19 +515,17 @@ else {
 }*/
  
  
- 
 int main(int argc, char *argv[])
 {
  
-    //TO DO 3 wektory deskrytporów dla 3 hostów narazie jest jedna
     std::vector<Client> Clients;
     Client client;
     Client *currentClient;  //wskaznik na aktualnego klienta
     std::string choice;
-    std::string currentHost;
-    std::vector<Client>::iterator currentClientIterator;
-    std::vector<std::string> hosts;
+    // std::string currentHost;
+    // std::vector<std::string> hosts;
     std::vector<std::pair<int, int>> openedDescriptors;     //para na deskryptor pliku + deskryptor socketa
+    std::vector<std::string> pathnames;                     //klient przechowuje tez pathnames                     
     bool exit = false;
     std::cout << "Welcome to MyNFS!\n";
     std::cout << "Server address (IP:PORT):" << std::endl;
@@ -462,6 +536,7 @@ int main(int argc, char *argv[])
     std::getline(std::cin, client.Password);
     Clients.push_back(client);
     client.openedDescriptors = openedDescriptors;
+    client.pathnames = pathnames;
     currentClient = &Clients[0];    //aktualnym klientem zostaje pierwszy
  
  
@@ -469,25 +544,27 @@ int main(int argc, char *argv[])
     {
  
         std::cout << "Available commands to run:" <<std::endl;
-        std::cout<< "open, read, write, lseek, close, unlink, exit, hostchange" << std::endl;
+        std::cout<< "open, read, write, lseek, close, unlink, fstat, exit, hostadd, hostchange, show" << std::endl;
         std::getline(std::cin, choice);
-        if (choice == "open") nfsopen(currentClient->IpPort, currentClient->openedDescriptors, currentClient->Login, currentClient->Password);
+        if (choice == "open") nfsopen(currentClient->IpPort, currentClient->openedDescriptors, currentClient->Login, currentClient->Password, currentClient->pathnames);
  
-        else if (choice == "read") nfsread(currentClient->IpPort, currentClient->openedDescriptors);
+        else if (choice == "read") nfsread(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
-        else if (choice == "write") nfswrite(currentClient->IpPort, currentClient->openedDescriptors);
+        else if (choice == "write") nfswrite(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
-        else if (choice == "lseek") nfslseek(currentClient->IpPort, currentClient->openedDescriptors);
+        else if (choice == "lseek") nfslseek(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
-        else if (choice == "close") nfsclose(currentClient->IpPort, currentClient->openedDescriptors);
+        else if (choice == "close") nfsclose(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
         else if (choice == "unlink") nfsunlink(currentClient->IpPort, currentClient->Login, currentClient->Password);
+
+        else if (choice == "fstat") nfsfstat(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
-            else if (choice == "hostchange") changeHost(Clients, *currentClient);
+        else if (choice == "hostchange") changeHost(Clients, &currentClient);
  
-            else if (choice == "hostAdd") addHost(Clients);
+        else if (choice == "hostadd") addHost(Clients);
        
-            //else if (choice == "hostRemove") removeHost(Clients);
+        //else if (choice == "hostRemove") removeHost(Clients);
  
         else if (choice == "show") showHosts(Clients, *currentClient);
  

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <arpa/inet.h>
+#include <iostream>
 
 #include "../include/packets.h"
 #include "handleSockets.h"
