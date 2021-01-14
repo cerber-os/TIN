@@ -1,8 +1,20 @@
 C=clang
 Cpp=clang++
-CFLAGS=-I include/ -Wall -g -pedantic -Wno-zero-length-array -fsanitize=address -fsanitize=leak -fno-omit-frame-pointer
+CFLAGS=-I include/ -Wall -pedantic -Wno-zero-length-array -fno-omit-frame-pointer
+
+ifeq ($(MAKECMDGOALS),asan_lsan)
+    CFLAGS += -O3 -fsanitize=address -fsanitize=leak
+else ifeq ($(MAKECMDGOALS),debug)
+	CFLAGS += -O0 -g -fsanitize=address -fsanitize=leak
+else
+    CFLAGS += -O3
+endif
 
 all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
+
+debug: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
+
+asan_lsan: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
 
 tests: out/01-read-write out/02-flock
 
