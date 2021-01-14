@@ -95,7 +95,7 @@ std::pair<int, int> findDescriptorsPair(int fd, std::vector<std::pair<int, int>>
     return std::make_pair(-1, -1);
 }
 
- bool check_number(string str) {
+bool check_number(string str) {
     for (int i = 0; i < str.length(); i++)
         if (isdigit(str[i]) == false)
             return false;

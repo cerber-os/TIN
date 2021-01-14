@@ -16,7 +16,7 @@ int createSocket(char *serverIp, uint16_t port) {
 
     //Convert IPv4 and IPv6 addresses from text to binary form
     if (inet_pton(AF_INET, serverIp, &serv_addr.sin_addr) <= 0) {
-        std::cout << "Error in inet_pton: probably invalid ip" << std::endl;
+        std::cout << "Error in inet_pton: probably invalid IP" << std::endl;
         return -1;
     }
 

@@ -1,10 +1,21 @@
 #include "fileOperations.h"
 using namespace std;
 
+bool check_if_its_number(string str) {
+    for (int i = 0; i < str.length(); i++)
+        if (isdigit(str[i]) == false)
+            return false;
+    return true;
+}
+
 uint16_t getPortFromString(string host){
     size_t pos = host.find_last_of(':');
     string port = host.substr(pos + 1, host.length() - 1);
-    return (uint16_t)stoul( port );
+    if(!port.empty() && check_if_its_number(port)){
+        return (uint16_t)stoul( port );
+    }
+    std::cerr << "Invalid port input" << std::endl;
+    return 0;
 }
 
 string getIpFromString (string host){
