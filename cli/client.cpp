@@ -82,7 +82,7 @@ void showErrorMsg(int errorNumber){
             std::cout << "MYNFS_ALREADY_LOCKED " << std::endl;
             break;
         case MYNFS_ACCESS_DENIED:
-            std::cout << "MYNFS_ALREADY_LOCKED " << std::endl;
+            std::cout << "Access denied. Wrong username or password " << std::endl;
             break;
     }
     return;
@@ -190,8 +190,16 @@ uint16_t orWord(uint16_t value, uint16_t word)
     return value | word;
 }
  
+void type_login_and_username_again(Client* client_pointer){
+    std::cout << "Type valid username and password" << std::endl;
+    std::cout << "Login:" << std::endl;
+    std::getline(std::cin, client_pointer->Login);
+    std::cout << "Password:" << std::endl;
+    std::getline(std::cin, client_pointer->Password);
+}
+
  
-int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::string &login, std::string &password, std::vector<std::string> &pathnames)
+int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescriptors, std::string &login, std::string &password, std::vector<std::string> &pathnames, Client* client_pointer)
 {
     std::string path;
     uint16_t oflag = 0;
@@ -236,6 +244,10 @@ int nfsopen(std::string &host, std::vector<std::pair<int, int>> &openedDescripto
     if(fd<0){
         std::cout << "Cannot open" << std::endl;
         showErrorMsg(fd);
+        if (fd == MYNFS_ACCESS_DENIED){
+            type_login_and_username_again(client_pointer);
+            std::cout << "Try again..." << std::endl;
+        }
     }
     else{
         std::cout << "Success" << std::endl;
@@ -381,7 +393,7 @@ int nfsclose(std::string &host, std::vector<std::pair<int, int>> &openedDescript
 }
 
 
-int nfsunlink(std::string &host, std::string &login, std::string &password)
+int nfsunlink(std::string &host, std::string &login, std::string &password, Client* client_pointer)
 {
     std::string path;
     std::cout << "Path to file:" << std::endl;
@@ -396,6 +408,10 @@ int nfsunlink(std::string &host, std::string &login, std::string &password)
     else{
         std::cout << "Cannot unlink" << std::endl;
         showErrorMsg(retval);
+        if (retval == MYNFS_ACCESS_DENIED){
+            type_login_and_username_again(client_pointer);
+            std::cout << "Try again..." << std::endl;
+        }
     }
     return 0;
 }
@@ -546,7 +562,7 @@ int main(int argc, char *argv[])
         std::cout << "Available commands to run:" <<std::endl;
         std::cout<< "open, read, write, lseek, close, unlink, fstat, exit, hostadd, hostchange, show" << std::endl;
         std::getline(std::cin, choice);
-        if (choice == "open") nfsopen(currentClient->IpPort, currentClient->openedDescriptors, currentClient->Login, currentClient->Password, currentClient->pathnames);
+        if (choice == "open") nfsopen(currentClient->IpPort, currentClient->openedDescriptors, currentClient->Login, currentClient->Password, currentClient->pathnames, currentClient);
  
         else if (choice == "read") nfsread(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
@@ -556,7 +572,7 @@ int main(int argc, char *argv[])
  
         else if (choice == "close") nfsclose(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  
-        else if (choice == "unlink") nfsunlink(currentClient->IpPort, currentClient->Login, currentClient->Password);
+        else if (choice == "unlink") nfsunlink(currentClient->IpPort, currentClient->Login, currentClient->Password, currentClient);
 
         else if (choice == "fstat") nfsfstat(currentClient->IpPort, currentClient->openedDescriptors, currentClient->pathnames);
  

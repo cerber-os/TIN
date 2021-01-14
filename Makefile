@@ -2,7 +2,7 @@ C=clang
 Cpp=clang++
 CFLAGS=-I include/ -Wall -g -pedantic -Wno-zero-length-array -fsanitize=address -fsanitize=leak -fno-omit-frame-pointer
 
-all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/libTestServer out/mynfs_library.so
+all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/mynfs_library.so
 
 tests: out/01-read-write out/02-flock
 
@@ -28,9 +28,6 @@ out/handleSockets.o: library/handleSockets.cpp
 
 out/client: cli/client.cpp out/fileOperations.o out/handleSockets.o
 	$(Cpp) $(CFLAGS) -o out/client out/fileOperations.o out/handleSockets.o cli/client.cpp
-
-out/libTestServer: library/libTestServer.cpp
-	$(Cpp) $(CFLAGS) -o out/libTestServer library/libTestServer.cpp
 
 out/mynfs_library.so: out/fileOperations.o out/handleSockets.o
 	$(Cpp) $(CFLAGS) --shared -o out/mynfs_library.so out/fileOperations.o out/handleSockets.o
