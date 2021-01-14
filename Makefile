@@ -2,8 +2,11 @@ C=clang
 Cpp=clang++
 CFLAGS=-I include/ -Wall -g -pedantic -Wno-zero-length-array -fsanitize=address -fsanitize=leak -fno-omit-frame-pointer
 
-all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/libTestServer
+all: out/logger.o out/list.o out/server out/fileOperations.o out/handleSockets.o out/client out/libTestServer out/mynfs_library.so
 
+tests: out/01-read-write out/02-flock
+
+# Pliki serwera
 out/logger.o: utils/logger.c
 	$(C) $(CFLAGS) -o out/logger.o -c utils/logger.c
 
@@ -18,16 +21,26 @@ out/server: server/server.c out/logger.o out/list.o out/config_parser.o server/c
 
 # Pliki klienta
 out/fileOperations.o: library/fileOperations.cpp
-	$(Cpp) $(CFLAGS) -o out/fileOperations.o -c library/fileOperations.cpp
+	$(Cpp) $(CFLAGS) -fPIC -o out/fileOperations.o -c library/fileOperations.cpp
 
 out/handleSockets.o: library/handleSockets.cpp
-	$(Cpp) $(CFLAGS) -o out/handleSockets.o -c library/handleSockets.cpp
+	$(Cpp) $(CFLAGS) -fPIC -o out/handleSockets.o -c library/handleSockets.cpp
 
 out/client: cli/client.cpp out/fileOperations.o out/handleSockets.o
 	$(Cpp) $(CFLAGS) -o out/client out/fileOperations.o out/handleSockets.o cli/client.cpp
 
 out/libTestServer: library/libTestServer.cpp
 	$(Cpp) $(CFLAGS) -o out/libTestServer library/libTestServer.cpp
+
+out/mynfs_library.so: out/fileOperations.o out/handleSockets.o
+	$(Cpp) $(CFLAGS) --shared -o out/mynfs_library.so out/fileOperations.o out/handleSockets.o
+
+# Testy
+out/01-read-write: tests/01-read-write.c out/mynfs_library.so
+	$(C) $(CFLAGS) -o out/01-read-write tests/01-read-write.c out/mynfs_library.so
+
+out/02-flock: tests/02-flock.c out/mynfs_library.so
+	$(C) $(CFLAGS) -o out/02-flock tests/02-flock.c out/mynfs_library.so
 
 clean:
 	rm out/*
